@@ -1,0 +1,16 @@
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sleep infinity
+    network_mode: service:haproxy
+    volumes:
+      - ..:/workspace:cached
+  haproxy:
+    image: haproxytech/haproxy-debian:2.6
+    ports:
+      - "5555:5555"
+    volumes:
+      - ./config/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+      - ./config/dataplaneapi.cfg:/usr/local/etc/haproxy/dataplaneapi.cfg
