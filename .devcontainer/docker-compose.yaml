@@ -8,9 +8,8 @@ services:
     volumes:
       - ..:/loadbalancer-manager-haproxy:cached
   haproxy:
-    image: haproxytech/haproxy-debian:2.6
+    build:
+      context: .
+      dockerfile: Dockerfile.haproxy
     ports:
       - "5555:5555"
-    volumes:
-      - ./config/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
-      - ./config/dataplaneapi.cfg:/usr/local/etc/haproxy/dataplaneapi.cfg

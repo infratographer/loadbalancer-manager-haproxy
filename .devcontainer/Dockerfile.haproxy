@@ -1,0 +1,4 @@
+FROM haproxytech/haproxy-debian:2.6
+
+COPY config/haproxy.cfg /usr/local/etc/haproxy/haproxy.cfg
+COPY config/dataplaneapi.cfg /usr/local/etc/haproxy/dataplaneapi.cfg
