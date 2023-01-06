@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/nats-io/nats.go"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"gocloud.dev/pubsub/natspubsub"
 )
@@ -20,10 +21,10 @@ func (m *Manager) Run(ctx context.Context) error {
 		m.Logger.Error("failed to update the config", "error", err)
 	}
 
-	// subscribe to nats queue -> doTheThings on msg receive
+	// subscribe to nats queue -> update config to latest on msg receive
 	sub, err := natspubsub.OpenSubscription(
 		m.NatsConn,
-		"example.mysubject",
+		viper.GetString("nats.subject"),
 		nil)
 	if err != nil {
 		// TODO - update
@@ -35,11 +36,15 @@ func (m *Manager) Run(ctx context.Context) error {
 	for {
 		msg, err := sub.Receive(ctx)
 		if err != nil {
+			if err == context.Canceled {
+				m.Logger.Info("context canceled")
+				return nil
+			}
 			m.Logger.Error("failed receiving nats message")
 			return err
 		}
 
-		m.Logger.Info("received nats message", "message", msg.Body)
+		m.Logger.Info("received nats message ", "message: ", string(msg.Body))
 
 		if err = m.updateConfigToLatest(); err != nil {
 			m.Logger.Error("failed to update the config", "error", err)

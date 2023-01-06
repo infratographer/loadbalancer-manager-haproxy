@@ -26,9 +26,9 @@ build:
 	@go mod download
 	@CGO_ENABLED=0 GOOS=linux go build -mod=readonly -v -o bin/${APP_NAME}
 
-clean: docker-clean
+clean: 
 	@echo Cleaning...
-	@rm -f app
+	@rm -f bin/${APP_NAME}
 	@rm -rf ./dist/
 	@rm -rf coverage.out
 	@go clean -testcache
@@ -36,13 +36,3 @@ clean: docker-clean
 vendor:
 	@go mod download
 	@go mod tidy
-
-docker-up: | build
-	@docker-compose build --no-cache --build-arg NAME=${APP_NAME}
-	@docker-compose  -f docker-compose.yml up -d app
-
-docker-down:
-	@docker-compose -f docker-compose.yml down
-
-docker-clean:
-	@docker-compose -f docker-compose.yml down --volumes

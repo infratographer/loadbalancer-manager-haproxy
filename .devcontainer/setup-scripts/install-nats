@@ -1,0 +1,23 @@
+#!/bin/bash
+
+echo "installing NATS"
+NATS_CLI_VERSION=0.0.35
+NATS_SERVER_VERSION=2.9.10
+NATS_NKEYS_VERSION=0.3.0
+NATS_NSC_VERSION=2.7.6
+
+go install github.com/nats-io/nats-server/v2@v${NATS_SERVER_VERSION}
+go install github.com/nats-io/natscli/nats@v${NATS_CLI_VERSION}
+go install github.com/nats-io/nkeys/nk@v${NATS_NKEYS_VERSION}
+go install github.com/nats-io/nsc/v2@v${NATS_NSC_VERSION}
+
+nk -gen user -pubout > /home/vscode/vscode.nkey
+pub_nkey=$(grep ^U /home/vscode/vscode.nkey)
+
+cat >/home/vscode/nats.conf << EOL
+authorization: {
+  users: [
+    { nkey: ${pub_nkey} }
+  ]
+}
+EOL

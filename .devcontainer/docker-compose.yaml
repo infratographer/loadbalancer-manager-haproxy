@@ -6,7 +6,7 @@ services:
     command: sleep infinity
     network_mode: service:haproxy
     volumes:
-      - ..:/workspace:cached
+      - ..:/loadbalancer-manager-haproxy:cached
   haproxy:
     image: haproxytech/haproxy-debian:2.6
     ports:

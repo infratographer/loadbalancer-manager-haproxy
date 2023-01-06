@@ -32,14 +32,20 @@ func init() {
 	runCmd.PersistentFlags().String("nats-nkey", "", "Path to the file containing the NATS nkey keypair")
 	viperBindFlag("nats.nkey", runCmd.PersistentFlags().Lookup("nats-nkey"))
 
-	runCmd.PersistentFlags().String("nats-token", "", "NATS auth token (for development only)")
-	viperBindFlag("nats.token", runCmd.PersistentFlags().Lookup("nats-token"))
+	runCmd.PersistentFlags().String("nats-subject", "loadbalancer-manager-haproxy", "NATS subject to subscribe to")
+	viperBindFlag("nats.subject", runCmd.PersistentFlags().Lookup("nats-subject"))
 
 	runCmd.PersistentFlags().String("dataplane-user-name", "haproxy", "DataplaneAPI user name")
 	viperBindFlag("dataplane.user.name", runCmd.PersistentFlags().Lookup("dataplane-user-name"))
 
 	runCmd.PersistentFlags().String("dataplane-user-pwd", "adminpwd", "DataplaneAPI user password")
 	viperBindFlag("dataplane.user.pwd", runCmd.PersistentFlags().Lookup("dataplane-user-pwd"))
+
+	runCmd.PersistentFlags().String("dataplane-config", "", "DataplaneAPI config")
+	viperBindFlag("dataplane.config", runCmd.PersistentFlags().Lookup("dataplane-config"))
+
+	runCmd.PersistentFlags().String("base-haproxy-config", "", "Base config for haproxy")
+	viperBindFlag("haproxy.config.base", runCmd.PersistentFlags().Lookup("base-haproxy-config"))
 
 	runCmd.PersistentFlags().String("loadbalancerapi-url", "", "LoadbalancerAPI url")
 	viperBindFlag("loadbalancerapi.url", runCmd.PersistentFlags().Lookup("loadbalancerapi-url"))
@@ -91,7 +97,7 @@ func validateMandatoryFlags() error {
 		errs = append(errs, ErrNATSURLRequired.Error())
 	}
 
-	if viper.GetString("nats.nkey") == "" && viper.GetString("nats.token") == "" {
+	if viper.GetString("nats.nkey") == "" {
 		errs = append(errs, ErrNATSAuthRequired.Error())
 	}
 
@@ -105,25 +111,13 @@ func validateMandatoryFlags() error {
 func newNatsOptions() []nats.Option {
 	opts := []nats.Option{}
 
-	token := viper.GetString("nats.token")
+	logger.Debug("enabling nkey authentication")
 	nkey := viper.GetString("nats.nkey")
-
-	if token != "" {
-		if !viper.GetBool("development") {
-			logger.Fatalw("cannot use token auth outside of development")
-		}
-
-		logger.Debug("enabling token authentication")
-
-		opts = append(opts, nats.Token(token))
-	} else if nkey != "" {
-		logger.Debug("enabling nkey authentication")
-		opt, err := nats.NkeyOptionFromSeed(nkey)
-		if err != nil {
-			logger.Fatalw("failed to configure nats nkey auth", "error", err)
-		}
-		opts = append(opts, opt)
+	opt, err := nats.NkeyOptionFromSeed(nkey)
+	if err != nil {
+		logger.Fatalw("failed to configure nats nkey auth", "error", err)
 	}
+	opts = append(opts, opt)
 
 	return opts
 }
