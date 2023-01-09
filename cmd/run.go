@@ -77,7 +77,7 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 
 	// init other components
 
-	mgr := &pkg.Manager{
+	mgr := &pkg.ManagerConfig{
 		Logger:   logger,
 		NatsConn: natsConn,
 	}
@@ -112,11 +112,14 @@ func newNatsOptions() []nats.Option {
 	opts := []nats.Option{}
 
 	logger.Debug("enabling nkey authentication")
+
 	nkey := viper.GetString("nats.nkey")
+
 	opt, err := nats.NkeyOptionFromSeed(nkey)
 	if err != nil {
 		logger.Fatalw("failed to configure nats nkey auth", "error", err)
 	}
+
 	opts = append(opts, opt)
 
 	return opts
