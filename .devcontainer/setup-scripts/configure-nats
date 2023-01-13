@@ -1,0 +1,17 @@
+#!/bin/sh
+
+echo "Creating NATS Operator"
+nsc add operator -n TEST-OPERATOR --sys --generate-signing-key
+
+echo "Creating NATS Account"
+nsc add account -n TEST-ACCOUNT
+
+echo "Creating NATS User"
+nsc add user -a TEST-ACCOUNT -n MANAGER
+
+echo "Generate NATS server config"
+mkdir /etc/nats-auth
+nsc generate config --mem-resolver --sys-account SYS > /etc/nats-auth/resolver.conf
+
+echo "Save NATS User creds"
+nsc generate creds -n MANAGER > /etc/nats-auth/manager.creds

@@ -29,8 +29,8 @@ func init() {
 	runCmd.PersistentFlags().String("nats-url", "", "NATS server connection url")
 	viperBindFlag("nats.url", runCmd.PersistentFlags().Lookup("nats-url"))
 
-	runCmd.PersistentFlags().String("nats-nkey", "", "Path to the file containing the NATS nkey keypair")
-	viperBindFlag("nats.nkey", runCmd.PersistentFlags().Lookup("nats-nkey"))
+	runCmd.PersistentFlags().String("nats-creds", "", "Path to the file containing the NATS credentials")
+	viperBindFlag("nats.creds", runCmd.PersistentFlags().Lookup("nats-creds"))
 
 	runCmd.PersistentFlags().String("nats-subject", "loadbalancer-manager-haproxy", "NATS subject to subscribe to")
 	viperBindFlag("nats.subject", runCmd.PersistentFlags().Lookup("nats-subject"))
@@ -68,7 +68,7 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 
 	natsConn, err := nats.Connect(
 		viper.GetString("nats.url"),
-		newNatsOptions()...,
+		nats.UserCredentials(viper.GetString("nats.creds")),
 	)
 	if err != nil {
 		logger.Fatalw("failed connecting to nats", "error", err)
@@ -97,7 +97,7 @@ func validateMandatoryFlags() error {
 		errs = append(errs, ErrNATSURLRequired.Error())
 	}
 
-	if viper.GetString("nats.nkey") == "" {
+	if viper.GetString("nats.creds") == "" {
 		errs = append(errs, ErrNATSAuthRequired.Error())
 	}
 
@@ -106,21 +106,4 @@ func validateMandatoryFlags() error {
 	}
 
 	return fmt.Errorf(strings.Join(errs, "\n")) //nolint:goerr113
-}
-
-func newNatsOptions() []nats.Option {
-	opts := []nats.Option{}
-
-	logger.Debug("enabling nkey authentication")
-
-	nkey := viper.GetString("nats.nkey")
-
-	opt, err := nats.NkeyOptionFromSeed(nkey)
-	if err != nil {
-		logger.Fatalw("failed to configure nats nkey auth", "error", err)
-	}
-
-	opts = append(opts, opt)
-
-	return opts
 }

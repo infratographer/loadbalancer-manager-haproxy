@@ -5,7 +5,4 @@ FROM nats:latest as nats
 FROM mcr.microsoft.com/vscode/devcontainers/go:0-${GO_VERSION}-bullseye
 
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive && \
-    apt-get -y install --no-install-recommends bash-completion vim 
-
-COPY setup-scripts/install-nats /usr/local/bin/
-RUN chmod +x /usr/local/bin/install-nats
+    apt-get -y install --no-install-recommends bash-completion vim

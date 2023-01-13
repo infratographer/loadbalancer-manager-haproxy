@@ -3,10 +3,8 @@
     "name": "loadbalancer-manager-haproxy",
     "dockerComposeFile":"docker-compose.yaml",
     "service": "dev",
-    "runServices": ["dev", "haproxy"],
+    "runServices": ["dev", "haproxy", "nats-auth", "nats-server"],
     "workspaceFolder": "/loadbalancer-manager-haproxy",
-    "postCreateCommand": "install-nats",
-    "postStartCommand": "nohup bash -c 'nats-server -c /home/vscode/nats.conf -l /tmp/nats-server.log &' > /tmp/nohup.out",
     "customizations": {
             // Configure properties specific to VS Code.
             "vscode": {
