@@ -1,7 +1,12 @@
 package pkg
 
-// TODO: Add your error definitions here
+import "errors"
+
 var (
-// ErrEventMissingName is returned when a name is missing
-// ErrEventMissingName = errors.New("name is missing")
+	// ErrDataPlaneNotReady is returned dataplaneapi fails to return a 200
+	ErrDataPlaneNotReady = errors.New("dataplaneapi failed to become ready")
+	// ErrDataPlaneHTTPUnauthorized is returned when the request is not authorized
+	ErrDataPlaneHTTPUnauthorized = errors.New("dataplaneapi received unauthorized request")
+	// ErrDataPlaneHTTPError is returned when the http response is an error
+	ErrDataPlaneHTTPError = errors.New("dataplaneapi http error")
 )

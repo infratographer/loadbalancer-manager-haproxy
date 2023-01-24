@@ -41,8 +41,8 @@ func init() {
 	runCmd.PersistentFlags().String("dataplane-user-pwd", "adminpwd", "DataplaneAPI user password")
 	viperBindFlag("dataplane.user.pwd", runCmd.PersistentFlags().Lookup("dataplane-user-pwd"))
 
-	runCmd.PersistentFlags().String("dataplane-config", "", "DataplaneAPI config")
-	viperBindFlag("dataplane.config", runCmd.PersistentFlags().Lookup("dataplane-config"))
+	runCmd.PersistentFlags().String("dataplane-url", "http://127.0.0.1:5555/v2/", "DataplaneAPI base url")
+	viperBindFlag("dataplane.url", runCmd.PersistentFlags().Lookup("dataplane-url"))
 
 	runCmd.PersistentFlags().String("base-haproxy-config", "", "Base config for haproxy")
 	viperBindFlag("haproxy.config.base", runCmd.PersistentFlags().Lookup("base-haproxy-config"))
@@ -76,13 +76,16 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 	defer natsConn.Close()
 
 	// init other components
+	dpc := pkg.NewDataPlaneClient(viper.GetString("dataplane.url"))
 
 	mgr := &pkg.ManagerConfig{
-		Logger:   logger,
-		NatsConn: natsConn,
+		Context:         ctx,
+		Logger:          logger,
+		NatsConn:        natsConn,
+		DataPlaneClient: dpc,
 	}
 
-	if err := mgr.Run(ctx); err != nil {
+	if err := mgr.Run(); err != nil {
 		logger.Fatalw("failed starting manager", "error", err)
 	}
 
@@ -99,6 +102,10 @@ func validateMandatoryFlags() error {
 
 	if viper.GetString("nats.creds") == "" {
 		errs = append(errs, ErrNATSAuthRequired.Error())
+	}
+
+	if viper.GetString("haproxy.config.base") == "" {
+		errs = append(errs, ErrHAProxyBaseConfigRequired.Error())
 	}
 
 	if len(errs) == 0 {
