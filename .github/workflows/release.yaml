@@ -4,20 +4,6 @@ on:
     tags: '*'
 
 jobs:
-  release:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Publish Helm charts
-        uses: stefanprodan/helm-gh-pages@master
-        with:
-          token: ${{ secrets.RELEASEBOT_PAT }}
-          charts_dir: chart
-          charts_url: "https://auerbecklabs.github.io/charts"
-          repository: "charts"
-          branch: gh-pages 
-
   image-build:
     runs-on: ubuntu-latest
     permissions:
