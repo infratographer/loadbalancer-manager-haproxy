@@ -7,7 +7,9 @@ import (
 	"os/signal"
 	"strings"
 
-	"go.infratographer.com/loadbalancer-manager-haproxy/internal/pkg"
+	"go.infratographer.com/loadbalancer-manager-haproxy/internal/pkg/dataplaneapi"
+	"go.infratographer.com/loadbalancer-manager-haproxy/internal/pkg/manager"
+	"go.infratographer.com/loadbalancer-manager-haproxy/internal/pkg/pubsub"
 
 	"github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
@@ -32,8 +34,8 @@ func init() {
 	runCmd.PersistentFlags().String("nats-creds", "", "Path to the file containing the NATS credentials")
 	viperBindFlag("nats.creds", runCmd.PersistentFlags().Lookup("nats-creds"))
 
-	runCmd.PersistentFlags().String("nats-subject", "loadbalancer-manager-haproxy", "NATS subject to subscribe to")
-	viperBindFlag("nats.subject", runCmd.PersistentFlags().Lookup("nats-subject"))
+	runCmd.PersistentFlags().StringSlice("nats-subjects", []string{"com.infratographer.events.load-balancer.>"}, "NATS subjects to subscribe to")
+	viperBindFlag("nats.subjects", runCmd.PersistentFlags().Lookup("nats-subjects"))
 
 	runCmd.PersistentFlags().String("dataplane-user-name", "haproxy", "DataplaneAPI user name")
 	viperBindFlag("dataplane.user.name", runCmd.PersistentFlags().Lookup("dataplane-user-name"))
@@ -66,22 +68,21 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 		cancel()
 	}()
 
-	natsConn, err := nats.Connect(
-		viper.GetString("nats.url"),
-		nats.UserCredentials(viper.GetString("nats.creds")),
-	)
+	// init NATS
+	nc, err := setupNATSClient(viper.GetString("nats.url"), viper.GetString("nats.creds"))
 	if err != nil {
-		logger.Fatalw("failed connecting to nats", "error", err)
+		return err
 	}
-	defer natsConn.Close()
+
+	defer nc.Conn.Close()
 
 	// init other components
-	dpc := pkg.NewDataPlaneClient(viper.GetString("dataplane.url"))
+	dpc := dataplaneapi.NewClient(dataplaneapi.WithBaseURL(viper.GetString("dataplane.url")))
 
-	mgr := &pkg.ManagerConfig{
+	mgr := &manager.Config{
 		Context:         ctx,
 		Logger:          logger,
-		NatsConn:        natsConn,
+		NATSClient:      nc,
 		DataPlaneClient: dpc,
 	}
 
@@ -90,6 +91,16 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 	}
 
 	return nil
+}
+
+func setupNATSClient(url, creds string) (*pubsub.NATSClient, error) {
+	natsConn, err := nats.Connect(url, nats.UserCredentials(creds))
+	if err != nil {
+		logger.Fatalw("failed connecting to nats", "error", err)
+		return nil, err
+	}
+
+	return pubsub.NewNATSClient(pubsub.WithNATSConn(natsConn), pubsub.WithNATSLogger(logger)), nil
 }
 
 // validateMandatoryFlags collects the mandatory flag validation
