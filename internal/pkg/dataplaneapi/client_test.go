@@ -1,4 +1,4 @@
-package pkg
+package dataplaneapi
 
 import (
 	"context"
@@ -34,7 +34,7 @@ func TestPostConfig(t *testing.T) {
 		}
 	})}
 
-	dc := DataPlaneClient{
+	dc := Client{
 		client:  tc,
 		baseURL: "http://localhost:5555/v2",
 	}
@@ -58,7 +58,7 @@ func TestAPIIsReady(t *testing.T) {
 		}
 	})}
 
-	dc := DataPlaneClient{
+	dc := Client{
 		client:  tcReady,
 		baseURL: "http://localhost:5555/v2",
 	}
@@ -75,7 +75,7 @@ func TestAPIIsReady(t *testing.T) {
 		}
 	})}
 
-	dc = DataPlaneClient{
+	dc = Client{
 		client:  tcNotReady,
 		baseURL: "http://localhost:5555/v2",
 	}

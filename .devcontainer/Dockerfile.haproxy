@@ -1,4 +1,12 @@
-FROM haproxytech/haproxy-debian:2.6
+FROM bitnami/haproxy:2.7.2
 
-COPY config/haproxy.cfg /usr/local/etc/haproxy/haproxy.cfg
-COPY config/dataplaneapi.cfg /usr/local/etc/haproxy/dataplaneapi.cfg
+COPY config/haproxy.cfg /bitnami/haproxy/conf/haproxy.cfg
+COPY config/dataplaneapi.cfg /bitnami/haproxy/conf/dataplaneapi.cfg
+
+USER root
+RUN chown -R 1001:1001 /bitnami && \
+    mkdir /etc/haproxy && \
+    mkdir -p /var/run/haproxy && \
+    chown -R 1001:1001 /var/run/haproxy && \
+    chown -R 1001:1001 /etc/haproxy
+USER 1001
