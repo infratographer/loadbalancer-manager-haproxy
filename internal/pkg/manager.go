@@ -21,13 +21,17 @@ var (
 	dataPlaneAPIRetrySleep = 1 * time.Second
 )
 
+type LBAPI interface {
+	GetLoadBalancer(ctx context.Context, id string) (*lbapi.LoadBalancer, error)
+}
+
 // ManagerConfig contains configuration and client connections
 type ManagerConfig struct {
 	Context         context.Context
 	Logger          *zap.SugaredLogger
 	NatsConn        *nats.Conn
 	DataPlaneClient *DataPlaneClient
-	LBClient        *lbapi.Client
+	LBClient        LBAPI
 }
 
 // Run subscribes to a NATS subject and updates the haproxy config via dataplaneapi
@@ -73,34 +77,47 @@ func (m *ManagerConfig) Run() error {
 
 		m.Logger.Info("received nats message ", "message: ", string(msg.Body))
 
-		if err = m.updateConfigToLatest(); err != nil {
+		// check specifc msg event type?
+
+		lbID := "44c9b3d8-16ad-4e86-b721-e52fb0fd5b7d" // TODO - @rizzza
+		if err = m.updateConfigToLatest(lbID); err != nil {
 			m.Logger.Error("failed to update the config", "error", err)
 		}
 
+		// TODO - @rizza - √√ on this ack with Tyler
 		msg.Ack()
 	}
 }
 
-func (m *ManagerConfig) updateConfigToLatest() error {
+// updateConfigToLatest update the haproxy cfg to either baseline or one requested from lbapi with optional lbID param
+func (m *ManagerConfig) updateConfigToLatest(lbID ...string) error {
 	m.Logger.Info("updating the config")
+
 	// load base config
 	cfg, err := parser.New(options.Path(viper.GetString("haproxy.config.base")), options.NoNamedDefaultsFrom)
 	if err != nil {
 		m.Logger.Fatalw("failed to load haproxy base config", "error", err)
 	}
 
-	// get desired state
-	lb := lbapi.LB{}
+	if len(lbID) == 1 {
+		// requested a lb uuid, query lbapi
+		// get desired state
+		lb, err := m.LBClient.GetLoadBalancer(m.Context, lbID[0])
+		if err != nil {
+			m.Logger.Errorf("failed to get loadbalancer %q", lbID[0], "error", err)
+			return err
+		}
 
-	// merge response
-	newCfg, err := mergeConfig(cfg, &lb)
-	if err != nil {
-		m.Logger.Error("failed to merge haproxy config", "error", err)
-		return err
+		// merge response
+		cfg, err = mergeConfig(cfg, lb)
+		if err != nil {
+			m.Logger.Error("failed to merge haproxy config", "error", err)
+			return err
+		}
 	}
 
 	// post dataplaneapi
-	if err = m.DataPlaneClient.PostConfig(m.Context, newCfg.String()); err != nil {
+	if err = m.DataPlaneClient.PostConfig(m.Context, cfg.String()); err != nil {
 		m.Logger.Error("failed to post new haproxy config", "error", err)
 		return err
 	}
@@ -122,8 +139,8 @@ func (m *ManagerConfig) waitForDataPlaneReady(retries int, sleep time.Duration) 
 	return ErrDataPlaneNotReady
 }
 
-// mergeConfig takes the response from lb api, modifies the base haproxy config then returns it
-func mergeConfig(cfg parser.Parser, lb *lbapi.LB) (parser.Parser, error) {
+// mergeConfig takes the response from lb api, merges with the base haproxy config and returns it
+func mergeConfig(cfg parser.Parser, lb *lbapi.LoadBalancer) (parser.Parser, error) {
 	if len(lb.Assignments) <= 0 {
 		return nil, fmt.Errorf("failed to recieve any assignments for load balancer %q", lb.ID)
 	}
@@ -152,9 +169,9 @@ func mergeConfig(cfg parser.Parser, lb *lbapi.LB) (parser.Parser, error) {
 		// TODO? check for no pools
 		for _, pool := range a.Pools {
 			for _, origin := range pool.Origins {
-				srvAddr := fmt.Sprintf("%s:%s check port %s", origin.IPAddress, origin.Port, origin.Port)
+				srvAddr := fmt.Sprintf("%s:%d check port %d", origin.IPAddress, origin.Port, origin.Port)
 
-				if !origin.Enabled {
+				if origin.Disabled {
 					srvAddr += " disabled"
 				}
 

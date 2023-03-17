@@ -22,13 +22,11 @@ func TestMergeConfig(t *testing.T) {
 		t.Parallel()
 
 		lbRespJson := `{
-  "lb_uuid": "58622a8d-54a2-4b0c-8b5f-8de7dff29f6f",
-  "lb_ip_address": "86.75.30.9",
-  "slug": "my-ssh-loadbalancer",
+  "id": "58622a8d-54a2-4b0c-8b5f-8de7dff29f6f",
   "assignments": []
 }
 `
-		lb := lbapi.LB{}
+		lb := lbapi.LoadBalancer{}
 		err := json.NewDecoder(strings.NewReader(lbRespJson)).Decode(&lb)
 		assert.Nil(t, err)
 		t.Logf("%+v", lb)
@@ -62,7 +60,7 @@ func TestMergeConfig(t *testing.T) {
 			assert.Nil(t, err)
 			defer jsonResp.Close()
 
-			lb := lbapi.LB{}
+			lb := lbapi.LoadBalancer{}
 			err = json.NewDecoder(jsonResp).Decode(&lb)
 			assert.Nil(t, err)
 			t.Logf("%+v", lb)
