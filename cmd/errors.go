@@ -9,4 +9,6 @@ var (
 	ErrNATSAuthRequired = errors.New("nats creds are required and cannot be empty")
 	// ErrHAProxyBaseConfigRequired is returned when the base HAProxy config is missing
 	ErrHAProxyBaseConfigRequired = errors.New("base haproxy config is required and cannot be empty")
+	// ErrLBAPIURLRequired is returned when the base HAProxy config is missing
+	ErrLBAPIURLRequired = errors.New("loadbalancer api url is required and cannot be empty")
 )
