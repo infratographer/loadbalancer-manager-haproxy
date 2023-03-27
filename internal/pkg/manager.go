@@ -99,8 +99,8 @@ func (m *ManagerConfig) updateConfigToLatest(lbID ...string) error {
 		m.Logger.Fatalw("failed to load haproxy base config", "error", err)
 	}
 
-	if len(lbID) == 1 {
-		// requested a lb uuid, query lbapi
+	if len(lbID) == 1 && len(viper.GetString("loadbalancerapi.url")) > 0 {
+		// requested a lb id, query lbapi
 		// get desired state
 		lb, err := m.LBClient.GetLoadBalancer(m.Context, lbID[0])
 		if err != nil {
