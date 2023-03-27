@@ -1,19 +1,19 @@
 package lbapi
 
-type Frontend struct {
+type Port struct {
 	ID   string `json:"id"`
 	Port int64  `json:"port"`
 }
 
 type Assignment struct {
-	ID       string   `json:"id"`
-	Frontend Frontend `json:"frontend"`
-	Pools    []Pool   `json:"pools"`
+	ID    string `json:"id"`
+	Port  Port   `json:"port"`
+	Pools []Pool `json:"pools"`
 }
 
 type Origin struct {
 	ID        string `json:"id"`
-	Name      string `json:"display_name"`
+	Name      string `json:"name"`
 	IPAddress string `json:"origin_target"`
 	Disabled  bool   `json:"origin_disabled"`
 	Port      int64  `json:"port"`
@@ -21,7 +21,7 @@ type Origin struct {
 
 type Pool struct {
 	ID      string   `json:"id"`
-	Name    string   `json:"display_name"`
+	Name    string   `json:"name"`
 	Origins []Origin `json:"origins"`
 }
 

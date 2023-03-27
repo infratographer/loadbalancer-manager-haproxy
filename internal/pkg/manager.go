@@ -146,18 +146,18 @@ func mergeConfig(cfg parser.Parser, lb *lbapi.LoadBalancer) (parser.Parser, erro
 	}
 
 	for _, a := range lb.Assignments {
-		// create frontend
-		if err := cfg.SectionsCreate(parser.Frontends, a.Frontend.ID); err != nil {
-			return nil, fmt.Errorf("failed to create frontend section with ID %q: %w", a.Frontend.ID, err)
+		// create port
+		if err := cfg.SectionsCreate(parser.Frontends, a.Port.ID); err != nil {
+			return nil, fmt.Errorf("failed to create frontend section with ID %q: %w", a.Port.ID, err)
 		}
 
-		if err := cfg.Insert(parser.Frontends, a.Frontend.ID, "bind", types.Bind{
-			Path: fmt.Sprintf("ipv4@:%d", a.Frontend.Port)}); err != nil {
+		if err := cfg.Insert(parser.Frontends, a.Port.ID, "bind", types.Bind{
+			Path: fmt.Sprintf("ipv4@:%d", a.Port.Port)}); err != nil {
 			return nil, fmt.Errorf("failed to create frontend attr bind: %w", err)
 		}
 
 		// map frontend to backend
-		if err := cfg.Set(parser.Frontends, a.Frontend.ID, "use_backend", types.UseBackend{Name: a.ID}); err != nil {
+		if err := cfg.Set(parser.Frontends, a.Port.ID, "use_backend", types.UseBackend{Name: a.ID}); err != nil {
 			return nil, fmt.Errorf("failed to create frontend attr use_backend: %w", err)
 		}
 

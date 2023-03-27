@@ -65,16 +65,18 @@ func (c Client) GetLoadBalancer(ctx context.Context, id string) (*LoadBalancer, 
 		if err := json.NewDecoder(resp.Body).Decode(lb); err != nil {
 			return nil, fmt.Errorf("failed to decode load balancer: %v", err)
 		}
+	case http.StatusNotFound:
+		return nil, ErrLBHTTPNotfound
 	case http.StatusUnauthorized:
 		return nil, ErrLBHTTPUnauthorized
 	case http.StatusInternalServerError:
 		return nil, ErrLBHTTPError
 	default:
-		bytes, err := io.ReadAll(resp.Body)
+		b, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read resp body")
 		}
-		return nil, fmt.Errorf("%s: %w", fmt.Sprintf("StatusCode (%d) - %s ", resp.StatusCode, string(bytes)), ErrLBHTTPError)
+		return nil, fmt.Errorf("%s: %w", fmt.Sprintf("StatusCode (%d) - %s ", resp.StatusCode, string(b)), ErrLBHTTPError)
 	}
 
 	return lb, nil
