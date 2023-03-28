@@ -11,6 +11,10 @@ import (
 	"github.com/hashicorp/go-retryablehttp"
 )
 
+const (
+	apiVersion = "v1"
+)
+
 type Client struct {
 	client  *retryablehttp.Client
 	baseURL string
@@ -48,7 +52,7 @@ func WithTimeout(timeout time.Duration) func(*Client) {
 
 func (c Client) GetLoadBalancer(ctx context.Context, id string) (*LoadBalancer, error) {
 	lb := &LoadBalancer{}
-	url := fmt.Sprintf("%s/loadbalancers/%s?verbose=true", c.baseURL, id)
+	url := fmt.Sprintf("%s/%s/loadbalancers/%s", c.baseURL, apiVersion, id)
 
 	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
@@ -81,4 +85,41 @@ func (c Client) GetLoadBalancer(ctx context.Context, id string) (*LoadBalancer, 
 	}
 
 	return lb, nil
+}
+
+func (c Client) GetPool(ctx context.Context, id string) (*Pool, error) {
+	pool := &Pool{}
+	url := fmt.Sprintf("%s/%s/loadbalancers/pools/%s", c.baseURL, apiVersion, id)
+
+	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+		if err := json.NewDecoder(resp.Body).Decode(pool); err != nil {
+			return nil, fmt.Errorf("failed to decode load balancer: %v", err)
+		}
+	case http.StatusNotFound:
+		return nil, ErrLBHTTPNotfound
+	case http.StatusUnauthorized:
+		return nil, ErrLBHTTPUnauthorized
+	case http.StatusInternalServerError:
+		return nil, ErrLBHTTPError
+	default:
+		b, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read resp body")
+		}
+		return nil, fmt.Errorf("%s: %w", fmt.Sprintf("StatusCode (%d) - %s ", resp.StatusCode, string(b)), ErrLBHTTPError)
+	}
+
+	return pool, nil
 }

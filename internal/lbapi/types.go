@@ -1,16 +1,5 @@
 package lbapi
 
-type Port struct {
-	ID   string `json:"id"`
-	Port int64  `json:"port"`
-}
-
-type Assignment struct {
-	ID    string `json:"id"`
-	Port  Port   `json:"port"`
-	Pools []Pool `json:"pools"`
-}
-
 type Origin struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
@@ -25,7 +14,16 @@ type Pool struct {
 	Origins []Origin `json:"origins"`
 }
 
+type Port struct {
+	AddressFamily string   `json:"address_family"`
+	ID            string   `json:"id"`
+	Name          string   `json:"name"`
+	Port          int64    `json:"port"`
+	Pools         []string `json:"pools"`
+	PoolData      []Pool
+}
+
 type LoadBalancer struct {
-	ID          string       `json:"id"`
-	Assignments []Assignment `json:"assignments"`
+	ID    string `json:"id"`
+	Ports []Port `json:"ports"`
 }

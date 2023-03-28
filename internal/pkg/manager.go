@@ -28,6 +28,7 @@ var (
 
 type lbAPI interface {
 	GetLoadBalancer(ctx context.Context, id string) (*lbapi.LoadBalancer, error)
+	GetPool(ctx context.Context, id string) (*lbapi.Pool, error)
 }
 
 // ManagerConfig contains configuration and client connections
@@ -133,6 +134,24 @@ func (m ManagerConfig) updateConfigToLatest(lbID ...string) error {
 			return err
 		}
 
+		// query each pool and copy the origins into our lb datastructure
+		for _, port := range lb.Ports {
+			for _, poolID := range port.Pools {
+				// query poolID
+				p, err := m.LBClient.GetPool(m.Context, poolID)
+				if err != nil {
+					return err
+				}
+
+				data := lbapi.Pool{
+					ID:      poolID,
+					Name:    p.Name,
+					Origins: p.Origins,
+				}
+				port.PoolData = append(port.PoolData, data)
+			}
+		}
+
 		// merge response
 		cfg, err = mergeConfig(cfg, lb)
 		if err != nil {
@@ -166,33 +185,28 @@ func (m ManagerConfig) waitForDataPlaneReady(retries int, sleep time.Duration) e
 
 // mergeConfig takes the response from lb api, merges with the base haproxy config and returns it
 func mergeConfig(cfg parser.Parser, lb *lbapi.LoadBalancer) (parser.Parser, error) {
-	if len(lb.Assignments) <= 0 {
-		return nil, fmt.Errorf("failed to recieve any assignments for load balancer %q", lb.ID)
-	}
-
-	for _, a := range lb.Assignments {
+	for _, p := range lb.Ports {
 		// create port
-		if err := cfg.SectionsCreate(parser.Frontends, a.Port.ID); err != nil {
-			return nil, fmt.Errorf("failed to create frontend section with ID %q: %w", a.Port.ID, err)
+		if err := cfg.SectionsCreate(parser.Frontends, p.Name); err != nil {
+			return nil, fmt.Errorf("failed to create frontend section with label %q: %w", p.Name, err)
 		}
 
-		if err := cfg.Insert(parser.Frontends, a.Port.ID, "bind", types.Bind{
-			Path: fmt.Sprintf("ipv4@:%d", a.Port.Port)}); err != nil {
+		if err := cfg.Insert(parser.Frontends, p.Name, "bind", types.Bind{
+			Path: fmt.Sprintf("%s@:%d", p.AddressFamily, p.Port)}); err != nil {
 			return nil, fmt.Errorf("failed to create frontend attr bind: %w", err)
 		}
 
 		// map frontend to backend
-		if err := cfg.Set(parser.Frontends, a.Port.ID, "use_backend", types.UseBackend{Name: a.ID}); err != nil {
+		if err := cfg.Set(parser.Frontends, p.Name, "use_backend", types.UseBackend{Name: p.Name}); err != nil {
 			return nil, fmt.Errorf("failed to create frontend attr use_backend: %w", err)
 		}
 
-		// create backends
-		if err := cfg.SectionsCreate(parser.Backends, a.ID); err != nil {
-			return nil, fmt.Errorf("failed to create section backend with ID %q': %w", a.ID, err)
+		// create backend
+		if err := cfg.SectionsCreate(parser.Backends, p.Name); err != nil {
+			return nil, fmt.Errorf("failed to create section backend with label %q': %w", p.Name, err)
 		}
 
-		// TODO? check for no pools
-		for _, pool := range a.Pools {
+		for _, pool := range p.PoolData {
 			for _, origin := range pool.Origins {
 				srvAddr := fmt.Sprintf("%s:%d check port %d", origin.IPAddress, origin.Port, origin.Port)
 
@@ -205,8 +219,8 @@ func mergeConfig(cfg parser.Parser, lb *lbapi.LoadBalancer) (parser.Parser, erro
 					Address: srvAddr,
 				}
 
-				if err := cfg.Set(parser.Backends, a.ID, "server", srvr); err != nil {
-					return nil, fmt.Errorf("failed to add backend %q attr server: %w", a.ID, err)
+				if err := cfg.Set(parser.Backends, p.Name, "server", srvr); err != nil {
+					return nil, fmt.Errorf("failed to add backend %q attr server: %w", p.Name, err)
 				}
 			}
 		}
