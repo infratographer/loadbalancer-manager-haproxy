@@ -26,7 +26,7 @@ var (
 	dataPlaneAPIRetrySleep = 1 * time.Second
 )
 
-type LBAPI interface {
+type lbAPI interface {
 	GetLoadBalancer(ctx context.Context, id string) (*lbapi.LoadBalancer, error)
 }
 
@@ -36,7 +36,7 @@ type ManagerConfig struct {
 	Logger          *zap.SugaredLogger
 	NatsConn        *nats.Conn
 	DataPlaneClient *DataPlaneClient
-	LBClient        LBAPI
+	LBClient        lbAPI
 }
 
 // Run subscribes to a NATS subject and updates the haproxy config via dataplaneapi
@@ -87,6 +87,7 @@ func (m *ManagerConfig) Run() error {
 	}
 }
 
+// processMsg message handler
 func (m ManagerConfig) processMsg(msg *pubsub.Message) error {
 	pubsubMsg := pubsubx.Message{}
 	if err := json.Unmarshal(msg.Body, &pubsubMsg); err != nil {
@@ -110,7 +111,7 @@ func (m ManagerConfig) processMsg(msg *pubsub.Message) error {
 }
 
 // updateConfigToLatest update the haproxy cfg to either baseline or one requested from lbapi with optional lbID param
-func (m *ManagerConfig) updateConfigToLatest(lbID ...string) error {
+func (m ManagerConfig) updateConfigToLatest(lbID ...string) error {
 	m.Logger.Info("updating the config")
 
 	// load base config
@@ -119,7 +120,12 @@ func (m *ManagerConfig) updateConfigToLatest(lbID ...string) error {
 		m.Logger.Fatalw("failed to load haproxy base config", "error", err)
 	}
 
-	if len(lbID) == 1 && len(viper.GetString("loadbalancerapi.url")) > 0 {
+	lbAPIConfigured := len(viper.GetString("loadbalancerapi.url")) > 0
+	if !lbAPIConfigured {
+		m.Logger.Warn("loadbalancerapi.url is not configured: defaulting to base haproxy config")
+	}
+
+	if len(lbID) == 1 && lbAPIConfigured {
 		// requested a lb id, query lbapi
 		// get desired state
 		lb, err := m.LBClient.GetLoadBalancer(m.Context, lbID[0])
@@ -144,7 +150,7 @@ func (m *ManagerConfig) updateConfigToLatest(lbID ...string) error {
 	return nil
 }
 
-func (m *ManagerConfig) waitForDataPlaneReady(retries int, sleep time.Duration) error {
+func (m ManagerConfig) waitForDataPlaneReady(retries int, sleep time.Duration) error {
 	for i := 0; i < retries; i++ {
 		if m.DataPlaneClient.apiIsReady(m.Context) {
 			m.Logger.Info("dataplaneapi is ready")
