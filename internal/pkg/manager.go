@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -12,6 +13,9 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/spf13/viper"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/lbapi"
+
+	"go.infratographer.com/x/pubsubx"
+	"go.infratographer.com/x/urnx"
 	"go.uber.org/zap"
 	"gocloud.dev/pubsub/natspubsub"
 )
@@ -43,7 +47,7 @@ func (m *ManagerConfig) Run() error {
 
 	// use desired config on start
 	if err := m.updateConfigToLatest(); err != nil {
-		m.Logger.Error("failed to update the config", "error", err)
+		m.Logger.Errorw("failed to initialize the config", zap.Error(err))
 	}
 
 	// subscribe to nats queue -> update config to latest on msg receive
@@ -52,11 +56,11 @@ func (m *ManagerConfig) Run() error {
 	subscription, err := natspubsub.OpenSubscription(m.NatsConn, subject, nil)
 	if err != nil {
 		// TODO - update
-		m.Logger.Error("failed to subscribe to queue ", "subject: ", subject)
+		m.Logger.Errorw("failed to subscribe to queue ", zap.String("subject", subject))
 		return err
 	}
 
-	m.Logger.Info("subscribed to NATS subject ", "subject: ", subject)
+	m.Logger.Infow("subscribed to NATS subject ", zap.String("subject", subject))
 
 	defer func() {
 		_ = subscription.Shutdown(m.Context)
@@ -75,16 +79,25 @@ func (m *ManagerConfig) Run() error {
 			return err
 		}
 
-		m.Logger.Info("received nats message ", "message: ", string(msg.Body))
-
-		// check specifc msg event type?
-
-		lbID := "44c9b3d8-16ad-4e86-b721-e52fb0fd5b7d" // TODO - @rizzza
-		if err = m.updateConfigToLatest(lbID); err != nil {
-			m.Logger.Error("failed to update the config", "error", err)
+		pubsubMsg := pubsubx.Message{}
+		if err := json.Unmarshal(msg.Body, &pubsubMsg); err != nil {
+			m.Logger.Errorw("failed to process data in msg", zap.Error(err))
+			msg.Nack() // TODO: not supported by this driver. On error... just return error or continue?
 		}
 
-		// TODO - @rizza - √√ on this ack with Tyler
+		urn, err := urnx.Parse(pubsubMsg.SubjectURN)
+		if err != nil {
+			m.Logger.Errorw("failed to parse pubsub msg subjectURN", zap.Error(err))
+			msg.Nack()
+		}
+
+		lbID := urn.ResourceID.String()
+		if err = m.updateConfigToLatest(lbID); err != nil {
+			m.Logger.Errorw("failed to update the config", zap.String("loadbalancer.id", lbID), zap.Error(err))
+			msg.Nack()
+		}
+
+		// TODO - @rizzza - √√ on this ack with Tyler
 		msg.Ack()
 	}
 }
@@ -104,23 +117,22 @@ func (m *ManagerConfig) updateConfigToLatest(lbID ...string) error {
 		// get desired state
 		lb, err := m.LBClient.GetLoadBalancer(m.Context, lbID[0])
 		if err != nil {
-			m.Logger.Errorf("failed to get loadbalancer %q", lbID[0], "error", err)
 			return err
 		}
 
 		// merge response
 		cfg, err = mergeConfig(cfg, lb)
 		if err != nil {
-			m.Logger.Error("failed to merge haproxy config", "error", err)
 			return err
 		}
 	}
 
 	// post dataplaneapi
 	if err = m.DataPlaneClient.PostConfig(m.Context, cfg.String()); err != nil {
-		m.Logger.Error("failed to post new haproxy config", "error", err)
 		return err
 	}
+
+	m.Logger.Info("config successfully updated")
 
 	return nil
 }
