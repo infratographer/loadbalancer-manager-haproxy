@@ -20,6 +20,7 @@ func NewClient(url string, opts ...func(*Client)) *Client {
 	retryCli := retryablehttp.NewClient()
 	retryCli.RetryMax = 3
 	retryCli.HTTPClient.Timeout = time.Second * 5
+	retryCli.Logger = nil
 
 	c := &Client{
 		baseURL: url,
