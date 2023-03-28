@@ -13,6 +13,7 @@ require (
 	github.com/stretchr/testify v1.8.1
 	go.infratographer.com/x v0.0.3
 	go.uber.org/zap v1.24.0
+	gocloud.dev v0.27.0
 	gocloud.dev/pubsub/natspubsub v0.27.0
 )
 
@@ -43,7 +44,6 @@ require (
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
-	gocloud.dev v0.27.0 // indirect
 	golang.org/x/crypto v0.4.0 // indirect
 	golang.org/x/net v0.4.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect

@@ -17,6 +17,7 @@ import (
 	"go.infratographer.com/x/pubsubx"
 	"go.infratographer.com/x/urnx"
 	"go.uber.org/zap"
+	"gocloud.dev/pubsub"
 	"gocloud.dev/pubsub/natspubsub"
 )
 
@@ -79,27 +80,33 @@ func (m *ManagerConfig) Run() error {
 			return err
 		}
 
-		pubsubMsg := pubsubx.Message{}
-		if err := json.Unmarshal(msg.Body, &pubsubMsg); err != nil {
-			m.Logger.Errorw("failed to process data in msg", zap.Error(err))
-			msg.Nack() // TODO: not supported by this driver. On error... just return error or continue?
-		}
+		_ = m.processMsg(msg)
 
-		urn, err := urnx.Parse(pubsubMsg.SubjectURN)
-		if err != nil {
-			m.Logger.Errorw("failed to parse pubsub msg subjectURN", zap.Error(err))
-			msg.Nack()
-		}
-
-		lbID := urn.ResourceID.String()
-		if err = m.updateConfigToLatest(lbID); err != nil {
-			m.Logger.Errorw("failed to update the config", zap.String("loadbalancer.id", lbID), zap.Error(err))
-			msg.Nack()
-		}
-
-		// TODO - @rizzza - √√ on this ack with Tyler
+		// TODO - @rizzza - √√ on this ack with Tyler. We ack everything? nack is fatal with this driver.
 		msg.Ack()
 	}
+}
+
+func (m ManagerConfig) processMsg(msg *pubsub.Message) error {
+	pubsubMsg := pubsubx.Message{}
+	if err := json.Unmarshal(msg.Body, &pubsubMsg); err != nil {
+		m.Logger.Errorw("failed to process data in msg", zap.Error(err))
+		return err
+	}
+
+	urn, err := urnx.Parse(pubsubMsg.SubjectURN)
+	if err != nil {
+		m.Logger.Errorw("failed to parse pubsub msg urn", zap.String("subjectURN", pubsubMsg.SubjectURN), zap.Error(err))
+		return err
+	}
+
+	lbID := urn.ResourceID.String()
+	if err = m.updateConfigToLatest(lbID); err != nil {
+		m.Logger.Errorw("failed to update haproxy config", zap.String("loadbalancer.id", lbID), zap.Error(err))
+		return err
+	}
+
+	return nil
 }
 
 // updateConfigToLatest update the haproxy cfg to either baseline or one requested from lbapi with optional lbID param
