@@ -1,4 +1,4 @@
-package pkg
+package dataplaneapi
 
 import (
 	"context"
@@ -34,7 +34,7 @@ func TestPostConfig(t *testing.T) {
 		}
 	})}
 
-	dc := DataPlaneClient{
+	dc := Client{
 		client:  tc,
 		baseURL: "http://localhost:5555/v2",
 	}
@@ -58,12 +58,12 @@ func TestAPIIsReady(t *testing.T) {
 		}
 	})}
 
-	dc := DataPlaneClient{
+	dc := Client{
 		client:  tcReady,
 		baseURL: "http://localhost:5555/v2",
 	}
 
-	ready := dc.apiIsReady(context.TODO())
+	ready := dc.ApiIsReady(context.TODO())
 	if !ready {
 		t.Error("expected dataplane api readiness to be true, got:", ready)
 	}
@@ -75,12 +75,12 @@ func TestAPIIsReady(t *testing.T) {
 		}
 	})}
 
-	dc = DataPlaneClient{
+	dc = Client{
 		client:  tcNotReady,
 		baseURL: "http://localhost:5555/v2",
 	}
 
-	ready = dc.apiIsReady(context.TODO())
+	ready = dc.ApiIsReady(context.TODO())
 	if ready {
 		t.Error("expected dataplane api readiness to be false, got:", ready)
 	}

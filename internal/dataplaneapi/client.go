@@ -1,4 +1,4 @@
-package pkg
+package dataplaneapi
 
 import (
 	"bytes"
@@ -11,15 +11,15 @@ import (
 
 var dataPlaneClientTimeout = 2 * time.Second
 
-// DataPlaneClient is the http client for Data Plane API
-type DataPlaneClient struct {
+// Client is the http client for Data Plane API
+type Client struct {
 	client  *http.Client
 	baseURL string
 }
 
-// NewDataPlaneClient returns an http client for Data Plane API
-func NewDataPlaneClient(url string) *DataPlaneClient {
-	return &DataPlaneClient{
+// NewClient returns an http client for Data Plane API
+func NewClient(url string) *Client {
+	return &Client{
 		client: &http.Client{
 			Timeout: dataPlaneClientTimeout,
 		},
@@ -27,8 +27,8 @@ func NewDataPlaneClient(url string) *DataPlaneClient {
 	}
 }
 
-// apiIsReady returns true when a 200 is returned for a GET request to the Data Plane API
-func (c *DataPlaneClient) apiIsReady(ctx context.Context) bool {
+// ApiIsReady returns true when a 200 is returned for a GET request to the Data Plane API
+func (c *Client) ApiIsReady(ctx context.Context) bool {
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL, nil)
 	req.SetBasicAuth(viper.GetString("dataplane.user.name"), viper.GetString("dataplane.user.pwd"))
 
@@ -44,7 +44,7 @@ func (c *DataPlaneClient) apiIsReady(ctx context.Context) bool {
 }
 
 // PostConfig pushes a new haproxy config in plain text using basic auth
-func (c *DataPlaneClient) PostConfig(ctx context.Context, config string) error {
+func (c *Client) PostConfig(ctx context.Context, config string) error {
 	url := c.baseURL + "/services/haproxy/configuration/raw?skip_version=true"
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBufferString(config))

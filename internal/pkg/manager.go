@@ -12,6 +12,7 @@ import (
 	"github.com/haproxytech/config-parser/v4/types"
 	"github.com/nats-io/nats.go"
 	"github.com/spf13/viper"
+	"go.infratographer.com/loadbalancer-manager-haproxy/internal/dataplaneapi"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/lbapi"
 
 	"go.infratographer.com/x/pubsubx"
@@ -36,7 +37,7 @@ type ManagerConfig struct {
 	Context         context.Context
 	Logger          *zap.SugaredLogger
 	NatsConn        *nats.Conn
-	DataPlaneClient *DataPlaneClient
+	DataPlaneClient dataPlaneAPI
 	LBClient        lbAPI
 }
 
@@ -171,7 +172,7 @@ func (m ManagerConfig) updateConfigToLatest(lbID ...string) error {
 
 func (m ManagerConfig) waitForDataPlaneReady(retries int, sleep time.Duration) error {
 	for i := 0; i < retries; i++ {
-		if m.DataPlaneClient.apiIsReady(m.Context) {
+		if m.DataPlaneClient.ApiIsReady(m.Context) {
 			m.Logger.Info("dataplaneapi is ready")
 			return nil
 		}
@@ -180,7 +181,7 @@ func (m ManagerConfig) waitForDataPlaneReady(retries int, sleep time.Duration) e
 		time.Sleep(sleep)
 	}
 
-	return ErrDataPlaneNotReady
+	return dataplaneapi.ErrDataPlaneNotReady
 }
 
 // mergeConfig takes the response from lb api, merges with the base haproxy config and returns it
