@@ -111,10 +111,9 @@ func validateMandatoryFlags() error {
 		errs = append(errs, ErrHAProxyBaseConfigRequired.Error())
 	}
 
-	// TODO: @rizzza - once GET loadbalancer/:id?verbose=true supported, enable this
-	// if viper.GetString("loadbalancerapi.url") == "" {
-	// 	errs = append(errs, ErrLBAPIURLRequired.Error())
-	// }
+	if viper.GetString("loadbalancerapi.url") == "" {
+		errs = append(errs, ErrLBAPIURLRequired.Error())
+	}
 
 	if len(errs) == 0 {
 		return nil
