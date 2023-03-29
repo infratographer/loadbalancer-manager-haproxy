@@ -15,8 +15,13 @@ const (
 	apiVersion = "v1"
 )
 
+// HTTPClient interface
+type HTTPClient interface {
+	Do(req *retryablehttp.Request) (*http.Response, error)
+}
+
 type Client struct {
-	client  *retryablehttp.Client
+	client  HTTPClient
 	baseURL string
 }
 
@@ -31,23 +36,7 @@ func NewClient(url string, opts ...func(*Client)) *Client {
 		client:  retryCli,
 	}
 
-	for _, opt := range opts {
-		opt(c)
-	}
-
 	return c
-}
-
-func WithRetries(r int) func(*Client) {
-	return func(c *Client) {
-		c.client.RetryMax = r
-	}
-}
-
-func WithTimeout(timeout time.Duration) func(*Client) {
-	return func(c *Client) {
-		c.client.HTTPClient.Timeout = timeout
-	}
 }
 
 func (c Client) GetLoadBalancer(ctx context.Context, id string) (*LoadBalancer, error) {

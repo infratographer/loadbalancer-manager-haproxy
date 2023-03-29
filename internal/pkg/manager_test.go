@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -9,7 +10,10 @@ import (
 	parser "github.com/haproxytech/config-parser/v4"
 	"github.com/haproxytech/config-parser/v4/options"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/lbapi"
+	"go.infratographer.com/loadbalancer-manager-haproxy/internal/pkg/mock"
+	"go.uber.org/zap"
 )
 
 const (
@@ -35,7 +39,7 @@ func TestMergeConfig(t *testing.T) {
 			t.Parallel()
 
 			cfg, err := parser.New(options.Path("../../.devcontainer/config/haproxy.cfg"), options.NoNamedDefaultsFrom)
-			assert.Nil(t, err)
+			require.Nil(t, err)
 
 			newCfg, err := mergeConfig(cfg, &tt.testInput)
 			assert.Nil(t, err)
@@ -43,11 +47,167 @@ func TestMergeConfig(t *testing.T) {
 			t.Log("Generated config ===> ", newCfg.String())
 
 			expCfg, err := os.ReadFile(fmt.Sprintf("%s/%s", testDataBaseDir, tt.expectedCfgFilename))
-			assert.Nil(t, err)
+			require.Nil(t, err)
 
 			assert.Equal(t, strings.TrimSpace(string(expCfg)), strings.TrimSpace(newCfg.String()))
 		})
 	}
+}
+
+func TestUpdateConfigToLatest(t *testing.T) {
+	l, err := zap.NewDevelopmentConfig().Build()
+	logger := l.Sugar()
+	require.Nil(t, err)
+
+	t.Run("errors on failure to query for loadbalancers/:id", func(t *testing.T) {
+		t.Parallel()
+
+		mockLBAPI := &mock.LBAPIClient{
+			DoGetLoadBalancer: func(ctx context.Context, id string) (*lbapi.LoadBalancer, error) {
+				return nil, fmt.Errorf("failure")
+			},
+		}
+
+		mgrCfg := ManagerConfig{
+			Logger:   logger,
+			LBClient: mockLBAPI,
+		}
+
+		err := mgrCfg.updateConfigToLatest("../../.devcontainer/config/haproxy.cfg", "58622a8d-54a2-4b0c-8b5f-8de7dff29f6f")
+		assert.NotNil(t, err)
+	})
+
+	t.Run("errors on failure to query for loadbalancers/pools/:id", func(t *testing.T) {
+		t.Parallel()
+
+		mockLBAPI := &mock.LBAPIClient{
+			DoGetLoadBalancer: func(ctx context.Context, id string) (*lbapi.LoadBalancer, error) {
+				return &lbapi.LoadBalancer{
+					Ports: []lbapi.Port{
+						{
+							Name:          "ssh-service",
+							AddressFamily: "ipv4",
+							Port:          22,
+							ID:            "16dd23d7-d3ab-42c8-a645-3169f2659a0b",
+							Pools: []string{
+								"49faa4a3-8d0b-4a7a-8bb9-7ed1b5995e49",
+							},
+						},
+					},
+				}, nil
+			},
+			DoGetPool: func(ctx context.Context, id string) (*lbapi.Pool, error) {
+				return nil, fmt.Errorf("failure")
+			},
+		}
+
+		mgrCfg := ManagerConfig{
+			Logger:   logger,
+			LBClient: mockLBAPI,
+		}
+
+		err := mgrCfg.updateConfigToLatest("../../.devcontainer/config/haproxy.cfg", "58622a8d-54a2-4b0c-8b5f-8de7dff29f6f")
+		assert.NotNil(t, err)
+	})
+
+	t.Run("successfully sets initial base config", func(t *testing.T) {
+		t.Parallel()
+
+		mockDataplaneAPI := &mock.DataplaneAPIClient{
+			DoPostConfig: func(ctx context.Context, config string) error {
+				return nil
+			},
+		}
+
+		mgrCfg := ManagerConfig{
+			Logger:          logger,
+			DataPlaneClient: mockDataplaneAPI,
+		}
+
+		err := mgrCfg.updateConfigToLatest("../../.devcontainer/config/haproxy.cfg")
+		require.Nil(t, err)
+
+		contents, err := os.ReadFile("../../.devcontainer/config/haproxy.cfg")
+		require.Nil(t, err)
+
+		// remove that 'unnamed_defaults_1' thing the haproxy parser library puts in the default section,
+		// even though the library is configured to not include default section labels
+		mgrCfg.currentConfig = strings.Replace(mgrCfg.currentConfig, " unnamed_defaults_1", "", -1)
+
+		assert.Equal(t, strings.TrimSpace(string(contents)), strings.TrimSpace(mgrCfg.currentConfig))
+	})
+
+	t.Run("successfully queries lb api and merges changes with base config", func(t *testing.T) {
+		t.Parallel()
+
+		mockLBAPI := &mock.LBAPIClient{
+			DoGetLoadBalancer: func(ctx context.Context, id string) (*lbapi.LoadBalancer, error) {
+				return &lbapi.LoadBalancer{
+					ID: "58622a8d-54a2-4b0c-8b5f-8de7dff29f6f",
+					Ports: []lbapi.Port{
+						{
+							Name:          "ssh-service",
+							AddressFamily: "ipv4",
+							Port:          22,
+							ID:            "16dd23d7-d3ab-42c8-a645-3169f2659a0b",
+							Pools: []string{
+								"49faa4a3-8d0b-4a7a-8bb9-7ed1b5995e49",
+							},
+						},
+					},
+				}, nil
+			},
+			DoGetPool: func(ctx context.Context, id string) (*lbapi.Pool, error) {
+				return &lbapi.Pool{
+					ID:   "49faa4a3-8d0b-4a7a-8bb9-7ed1b5995e49",
+					Name: "ssh-service-a",
+					Origins: []lbapi.Origin{
+						{
+							ID:        "c0a80101-0000-0000-0000-000000000001",
+							Name:      "svr1-2222",
+							IPAddress: "1.2.3.4",
+							Disabled:  false,
+							Port:      2222,
+						},
+						{
+							ID:        "c0a80101-0000-0000-0000-000000000002",
+							Name:      "svr1-222",
+							IPAddress: "1.2.3.4",
+							Disabled:  false,
+							Port:      222,
+						},
+						{
+							ID:        "c0a80101-0000-0000-0000-000000000003",
+							Name:      "svr2",
+							IPAddress: "4.3.2.1",
+							Disabled:  true,
+							Port:      2222,
+						},
+					},
+				}, nil
+			},
+		}
+
+		mockDataplaneAPI := &mock.DataplaneAPIClient{
+			DoPostConfig: func(ctx context.Context, config string) error {
+				return nil
+			},
+		}
+
+		mgrCfg := ManagerConfig{
+			Logger:          logger,
+			LBClient:        mockLBAPI,
+			DataPlaneClient: mockDataplaneAPI,
+		}
+
+		err := mgrCfg.updateConfigToLatest("../../.devcontainer/config/haproxy.cfg", "58622a8d-54a2-4b0c-8b5f-8de7dff29f6f")
+		require.Nil(t, err)
+
+		expCfg, err := os.ReadFile(fmt.Sprintf("%s/%s", testDataBaseDir, "lb-ex-1-exp.cfg"))
+		require.Nil(t, err)
+
+		assert.Equal(t, strings.TrimSpace(string(expCfg)), strings.TrimSpace(mgrCfg.currentConfig))
+	})
 }
 
 var mergeTestData1 = lbapi.LoadBalancer{
