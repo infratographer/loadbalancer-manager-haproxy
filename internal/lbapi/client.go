@@ -17,7 +17,7 @@ const (
 
 // HTTPClient interface
 type HTTPClient interface {
-	Do(req *retryablehttp.Request) (*http.Response, error)
+	Do(req *http.Request) (*http.Response, error)
 }
 
 type Client struct {
@@ -26,6 +26,7 @@ type Client struct {
 }
 
 func NewClient(url string, opts ...func(*Client)) *Client {
+	// default retryable http client
 	retryCli := retryablehttp.NewClient()
 	retryCli.RetryMax = 3
 	retryCli.HTTPClient.Timeout = time.Second * 5
@@ -33,11 +34,24 @@ func NewClient(url string, opts ...func(*Client)) *Client {
 
 	c := &Client{
 		baseURL: url,
-		client:  retryCli,
+		client:  retryCli.HTTPClient,
+	}
+
+	for _, opt := range opts {
+		opt(c)
 	}
 
 	return c
 }
+
+// WithHTTPClient inject your specific http client
+func WithHTTPClient(httpClient *http.Client) func(*Client) {
+	return func(c *Client) {
+		c.client = httpClient
+	}
+}
+
+
 
 // GetLoadBalancer returns a load balancer by id
 func (c Client) GetLoadBalancer(ctx context.Context, id string) (*LoadBalancer, error) {
@@ -49,7 +63,7 @@ func (c Client) GetLoadBalancer(ctx context.Context, id string) (*LoadBalancer, 
 		return nil, err
 	}
 
-	resp, err := c.client.Do(req)
+	resp, err := c.client.Do(req.Request)
 	if err != nil {
 		return nil, err
 	}
@@ -87,7 +101,7 @@ func (c Client) GetPool(ctx context.Context, id string) (*Pool, error) {
 		return nil, err
 	}
 
-	resp, err := c.client.Do(req)
+	resp, err := c.client.Do(req.Request)
 	if err != nil {
 		return nil, err
 	}

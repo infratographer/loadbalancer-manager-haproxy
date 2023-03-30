@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/hashicorp/go-retryablehttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/lbapi/mock"
@@ -15,7 +14,7 @@ import (
 
 func newLBAPIMock(respJSON string, respCode int) *mock.HTTPClient {
 	mockCli := &mock.HTTPClient{}
-	mockCli.DoFunc = func(*retryablehttp.Request) (*http.Response, error) {
+	mockCli.DoFunc = func(*http.Request) (*http.Response, error) {
 		json := respJSON
 
 		r := io.NopCloser(strings.NewReader(json))
