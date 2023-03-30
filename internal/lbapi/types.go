@@ -20,7 +20,6 @@ type Port struct {
 	Name          string   `json:"name"`
 	Port          int64    `json:"port"`
 	Pools         []string `json:"pools"`
-	PoolData      []Pool   `json:"_"`
 }
 
 type LoadBalancer struct {

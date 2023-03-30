@@ -37,6 +37,34 @@ type dataPlaneAPI interface {
 	ApiIsReady(ctx context.Context) bool
 }
 
+// TODO: move from pkg to internal/manager package
+type Origin struct {
+	ID        string
+	Name      string
+	IPAddress string
+	Disabled  bool
+	Port      int64
+}
+
+type Pool struct {
+	ID      string
+	Name    string
+	Origins []Origin
+}
+
+type Port struct {
+	AddressFamily string
+	ID            string
+	Name          string
+	Port          int64
+	Pools         []Pool
+}
+
+type LoadBalancer struct {
+	ID    string
+	Ports []Port
+}
+
 // ManagerConfig contains configuration and client connections
 type ManagerConfig struct {
 	Context         context.Context
@@ -143,23 +171,41 @@ func (m *ManagerConfig) updateConfigToLatest(lbID ...string) error {
 			return err
 		}
 
-		lb := lbResp.LoadBalancer
+		lb := LoadBalancer{
+			ID: lbResp.LoadBalancer.ID,
+		}
 
-		// query each pool and store the origins
+		// translate responses, populate data structure
 		for i, port := range lbResp.LoadBalancer.Ports {
+			lb.Ports = append(lb.Ports, Port{
+				AddressFamily: port.AddressFamily,
+				ID:            port.ID,
+				Name:          port.Name,
+				Port:          port.Port,
+			})
+
 			for _, poolID := range port.Pools {
 				poolResp, err := m.LBClient.GetPool(m.Context, poolID)
 				if err != nil {
 					return err
 				}
 
-				data := lbapi.Pool{
-					ID:      poolID,
-					Name:    poolResp.Pool.Name,
-					Origins: poolResp.Pool.Origins,
+				data := Pool{
+					ID:   poolID,
+					Name: poolResp.Pool.Name,
 				}
 
-				lb.Ports[i].PoolData = append(port.PoolData, data)
+				for _, o := range poolResp.Pool.Origins {
+					data.Origins = append(data.Origins, Origin{
+						ID:        o.ID,
+						Name:      o.Name,
+						IPAddress: o.IPAddress,
+						Disabled:  o.Disabled,
+						Port:      o.Port,
+					})
+				}
+
+				lb.Ports[i].Pools = append(lb.Ports[i].Pools, data)
 			}
 		}
 
@@ -196,7 +242,7 @@ func (m ManagerConfig) waitForDataPlaneReady(retries int, sleep time.Duration) e
 }
 
 // mergeConfig takes the response from lb api, merges with the base haproxy config and returns it
-func mergeConfig(cfg parser.Parser, lb *lbapi.LoadBalancer) (parser.Parser, error) {
+func mergeConfig(cfg parser.Parser, lb *LoadBalancer) (parser.Parser, error) {
 	for _, p := range lb.Ports {
 		// create port
 		if err := cfg.SectionsCreate(parser.Frontends, p.Name); err != nil {
@@ -218,7 +264,7 @@ func mergeConfig(cfg parser.Parser, lb *lbapi.LoadBalancer) (parser.Parser, erro
 			return nil, fmt.Errorf("failed to create section backend with label %q': %v", p.Name, err)
 		}
 
-		for _, pool := range p.PoolData {
+		for _, pool := range p.Pools {
 			for _, origin := range pool.Origins {
 				srvAddr := fmt.Sprintf("%s:%d check port %d", origin.IPAddress, origin.Port, origin.Port)
 

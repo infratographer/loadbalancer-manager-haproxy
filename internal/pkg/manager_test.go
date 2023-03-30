@@ -24,7 +24,7 @@ const (
 func TestMergeConfig(t *testing.T) {
 	MergeConfigTests := []struct {
 		name                string
-		testInput           lbapi.LoadBalancer
+		testInput           LoadBalancer
 		expectedCfgFilename string
 	}{
 		{"ssh service one pool", mergeTestData1, "lb-ex-1-exp.cfg"},
@@ -221,19 +221,19 @@ func TestUpdateConfigToLatest(t *testing.T) {
 	})
 }
 
-var mergeTestData1 = lbapi.LoadBalancer{
+var mergeTestData1 = LoadBalancer{
 	ID: "58622a8d-54a2-4b0c-8b5f-8de7dff29f6f",
-	Ports: []lbapi.Port{
+	Ports: []Port{
 		{
 			Name:          "ssh-service",
 			AddressFamily: "ipv4",
 			Port:          22,
 			ID:            "16dd23d7-d3ab-42c8-a645-3169f2659a0b",
-			PoolData: []lbapi.Pool{
+			Pools: []Pool{
 				{
 					ID:   "49faa4a3-8d0b-4a7a-8bb9-7ed1b5995e49",
 					Name: "ssh-service-a",
-					Origins: []lbapi.Origin{
+					Origins: []Origin{
 						{
 							ID:        "c0a80101-0000-0000-0000-000000000001",
 							Name:      "svr1-2222",
@@ -262,19 +262,19 @@ var mergeTestData1 = lbapi.LoadBalancer{
 	},
 }
 
-var mergeTestData2 = lbapi.LoadBalancer{
+var mergeTestData2 = LoadBalancer{
 	ID: "58622a8d-54a2-4b0c-8b5f-8de7dff29f6f",
-	Ports: []lbapi.Port{
+	Ports: []Port{
 		{
 			Name:          "ssh-service",
 			AddressFamily: "ipv4",
 			Port:          22,
 			ID:            "16dd23d7-d3ab-42c8-a645-3169f2659a0b",
-			PoolData: []lbapi.Pool{
+			Pools: []Pool{
 				{
 					ID:   "49faa4a3-8d0b-4a7a-8bb9-7ed1b5995e49",
 					Name: "ssh-service-a",
-					Origins: []lbapi.Origin{
+					Origins: []Origin{
 						{
 							ID:        "c0a80101-0000-0000-0000-000000000001",
 							Name:      "svr1-2222",
@@ -301,7 +301,7 @@ var mergeTestData2 = lbapi.LoadBalancer{
 				{
 					ID:   "c9bd57ac-6d88-4786-849e-0b228c17d645",
 					Name: "ssh-service-b",
-					Origins: []lbapi.Origin{
+					Origins: []Origin{
 						{
 							ID:        "b1982331-0000-0000-0000-000000000001",
 							Name:      "svr1-2222",
@@ -316,19 +316,19 @@ var mergeTestData2 = lbapi.LoadBalancer{
 	},
 }
 
-var mergeTestData3 = lbapi.LoadBalancer{
+var mergeTestData3 = LoadBalancer{
 	ID: "a522bc95-2a74-4005-919d-6ae0a5be056d",
-	Ports: []lbapi.Port{
+	Ports: []Port{
 		{
 			Name:          "http",
 			AddressFamily: "ipv4",
 			Port:          80,
 			ID:            "16dd23d7-d3ab-42c8-a645-3169f2659a0b",
-			PoolData: []lbapi.Pool{
+			Pools: []Pool{
 				{
 					ID:   "49faa4a3-8d0b-4a7a-8bb9-7ed1b5995e49",
 					Name: "ssh-service-a",
-					Origins: []lbapi.Origin{
+					Origins: []Origin{
 						{
 							ID:        "c0a80101-0000-0000-0000-000000000001",
 							Name:      "svr1",
@@ -345,11 +345,11 @@ var mergeTestData3 = lbapi.LoadBalancer{
 			AddressFamily: "ipv4",
 			Port:          443,
 			ID:            "8ca812cc-9c3d-4fed-95be-40a773f7d876",
-			PoolData: []lbapi.Pool{
+			Pools: []Pool{
 				{
 					ID:   "d94ad98b-b074-4794-896f-d71ae3b7b0ac",
 					Name: "ssh-service-a",
-					Origins: []lbapi.Origin{
+					Origins: []Origin{
 						{
 							ID:        "676a1536-0a17-4676-9296-ee957e5871c1",
 							Name:      "svr1",
