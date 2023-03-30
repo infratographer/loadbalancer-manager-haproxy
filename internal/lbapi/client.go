@@ -51,11 +51,9 @@ func WithHTTPClient(httpClient *http.Client) func(*Client) {
 	}
 }
 
-
-
 // GetLoadBalancer returns a load balancer by id
-func (c Client) GetLoadBalancer(ctx context.Context, id string) (*LoadBalancer, error) {
-	lb := &LoadBalancer{}
+func (c Client) GetLoadBalancer(ctx context.Context, id string) (*LoadBalancerResponse, error) {
+	lb := &LoadBalancerResponse{}
 	url := fmt.Sprintf("%s/%s/loadbalancers/%s", c.baseURL, apiVersion, id)
 
 	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodGet, url, nil)
@@ -92,8 +90,8 @@ func (c Client) GetLoadBalancer(ctx context.Context, id string) (*LoadBalancer, 
 }
 
 // GetPool returns a load balancer pool  by id
-func (c Client) GetPool(ctx context.Context, id string) (*Pool, error) {
-	pool := &Pool{}
+func (c Client) GetPool(ctx context.Context, id string) (*PoolResponse, error) {
+	pool := &PoolResponse{}
 	url := fmt.Sprintf("%s/%s/loadbalancers/pools/%s", c.baseURL, apiVersion, id)
 
 	req, err := retryablehttp.NewRequestWithContext(ctx, http.MethodGet, url, nil)

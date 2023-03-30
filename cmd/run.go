@@ -87,6 +87,7 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 		NatsConn:        natsConn,
 		DataPlaneClient: dpc,
 		LBClient:        lbc,
+		BaseCfgPath:     viper.GetString("haproxy.config.base"),
 	}
 
 	if err := mgr.Run(); err != nil {

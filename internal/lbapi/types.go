@@ -20,10 +20,25 @@ type Port struct {
 	Name          string   `json:"name"`
 	Port          int64    `json:"port"`
 	Pools         []string `json:"pools"`
-	PoolData      []Pool
+	PoolData      []Pool   `json:"_"`
 }
 
 type LoadBalancer struct {
 	ID    string `json:"id"`
 	Ports []Port `json:"ports"`
+}
+
+type v1ResponseMetaData struct {
+	Version string `json:"version"`
+	Kind    string `json:"kind"`
+}
+
+type LoadBalancerResponse struct {
+	v1ResponseMetaData
+	LoadBalancer LoadBalancer `json:"load_balancer"`
+}
+
+type PoolResponse struct {
+	v1ResponseMetaData
+	Pool Pool `json:"pool"`
 }

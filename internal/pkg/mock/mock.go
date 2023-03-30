@@ -8,15 +8,15 @@ import (
 
 // LBAPIClient mock client
 type LBAPIClient struct {
-	DoGetLoadBalancer func(ctx context.Context, id string) (*lbapi.LoadBalancer, error)
-	DoGetPool         func(ctx context.Context, id string) (*lbapi.Pool, error)
+	DoGetLoadBalancer func(ctx context.Context, id string) (*lbapi.LoadBalancerResponse, error)
+	DoGetPool         func(ctx context.Context, id string) (*lbapi.PoolResponse, error)
 }
 
-func (c LBAPIClient) GetLoadBalancer(ctx context.Context, id string) (*lbapi.LoadBalancer, error) {
+func (c LBAPIClient) GetLoadBalancer(ctx context.Context, id string) (*lbapi.LoadBalancerResponse, error) {
 	return c.DoGetLoadBalancer(ctx, id)
 }
 
-func (c LBAPIClient) GetPool(ctx context.Context, id string) (*lbapi.Pool, error) {
+func (c LBAPIClient) GetPool(ctx context.Context, id string) (*lbapi.PoolResponse, error) {
 	return c.DoGetPool(ctx, id)
 }
 

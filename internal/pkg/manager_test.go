@@ -18,6 +18,7 @@ import (
 
 const (
 	testDataBaseDir = "testdata"
+	testBaseCfgPath = "../../.devcontainer/config/haproxy.cfg"
 )
 
 func TestMergeConfig(t *testing.T) {
@@ -63,17 +64,18 @@ func TestUpdateConfigToLatest(t *testing.T) {
 		t.Parallel()
 
 		mockLBAPI := &mock.LBAPIClient{
-			DoGetLoadBalancer: func(ctx context.Context, id string) (*lbapi.LoadBalancer, error) {
+			DoGetLoadBalancer: func(ctx context.Context, id string) (*lbapi.LoadBalancerResponse, error) {
 				return nil, fmt.Errorf("failure")
 			},
 		}
 
 		mgrCfg := ManagerConfig{
-			Logger:   logger,
-			LBClient: mockLBAPI,
+			Logger:      logger,
+			LBClient:    mockLBAPI,
+			BaseCfgPath: testBaseCfgPath,
 		}
 
-		err := mgrCfg.updateConfigToLatest("../../.devcontainer/config/haproxy.cfg", "58622a8d-54a2-4b0c-8b5f-8de7dff29f6f")
+		err := mgrCfg.updateConfigToLatest("58622a8d-54a2-4b0c-8b5f-8de7dff29f6f")
 		assert.NotNil(t, err)
 	})
 
@@ -81,32 +83,35 @@ func TestUpdateConfigToLatest(t *testing.T) {
 		t.Parallel()
 
 		mockLBAPI := &mock.LBAPIClient{
-			DoGetLoadBalancer: func(ctx context.Context, id string) (*lbapi.LoadBalancer, error) {
-				return &lbapi.LoadBalancer{
-					Ports: []lbapi.Port{
-						{
-							Name:          "ssh-service",
-							AddressFamily: "ipv4",
-							Port:          22,
-							ID:            "16dd23d7-d3ab-42c8-a645-3169f2659a0b",
-							Pools: []string{
-								"49faa4a3-8d0b-4a7a-8bb9-7ed1b5995e49",
+			DoGetLoadBalancer: func(ctx context.Context, id string) (*lbapi.LoadBalancerResponse, error) {
+				return &lbapi.LoadBalancerResponse{
+					LoadBalancer: lbapi.LoadBalancer{
+						Ports: []lbapi.Port{
+							{
+								Name:          "ssh-service",
+								AddressFamily: "ipv4",
+								Port:          22,
+								ID:            "16dd23d7-d3ab-42c8-a645-3169f2659a0b",
+								Pools: []string{
+									"49faa4a3-8d0b-4a7a-8bb9-7ed1b5995e49",
+								},
 							},
 						},
 					},
 				}, nil
 			},
-			DoGetPool: func(ctx context.Context, id string) (*lbapi.Pool, error) {
+			DoGetPool: func(ctx context.Context, id string) (*lbapi.PoolResponse, error) {
 				return nil, fmt.Errorf("failure")
 			},
 		}
 
 		mgrCfg := ManagerConfig{
-			Logger:   logger,
-			LBClient: mockLBAPI,
+			Logger:      logger,
+			LBClient:    mockLBAPI,
+			BaseCfgPath: testBaseCfgPath,
 		}
 
-		err := mgrCfg.updateConfigToLatest("../../.devcontainer/config/haproxy.cfg", "58622a8d-54a2-4b0c-8b5f-8de7dff29f6f")
+		err := mgrCfg.updateConfigToLatest("58622a8d-54a2-4b0c-8b5f-8de7dff29f6f")
 		assert.NotNil(t, err)
 	})
 
@@ -122,12 +127,13 @@ func TestUpdateConfigToLatest(t *testing.T) {
 		mgrCfg := ManagerConfig{
 			Logger:          logger,
 			DataPlaneClient: mockDataplaneAPI,
+			BaseCfgPath:     testBaseCfgPath,
 		}
 
-		err := mgrCfg.updateConfigToLatest("../../.devcontainer/config/haproxy.cfg")
+		err := mgrCfg.updateConfigToLatest()
 		require.Nil(t, err)
 
-		contents, err := os.ReadFile("../../.devcontainer/config/haproxy.cfg")
+		contents, err := os.ReadFile(testBaseCfgPath)
 		require.Nil(t, err)
 
 		// remove that 'unnamed_defaults_1' thing the haproxy parser library puts in the default section,
@@ -141,47 +147,51 @@ func TestUpdateConfigToLatest(t *testing.T) {
 		t.Parallel()
 
 		mockLBAPI := &mock.LBAPIClient{
-			DoGetLoadBalancer: func(ctx context.Context, id string) (*lbapi.LoadBalancer, error) {
-				return &lbapi.LoadBalancer{
-					ID: "58622a8d-54a2-4b0c-8b5f-8de7dff29f6f",
-					Ports: []lbapi.Port{
-						{
-							Name:          "ssh-service",
-							AddressFamily: "ipv4",
-							Port:          22,
-							ID:            "16dd23d7-d3ab-42c8-a645-3169f2659a0b",
-							Pools: []string{
-								"49faa4a3-8d0b-4a7a-8bb9-7ed1b5995e49",
+			DoGetLoadBalancer: func(ctx context.Context, id string) (*lbapi.LoadBalancerResponse, error) {
+				return &lbapi.LoadBalancerResponse{
+					LoadBalancer: lbapi.LoadBalancer{
+						ID: "58622a8d-54a2-4b0c-8b5f-8de7dff29f6f",
+						Ports: []lbapi.Port{
+							{
+								Name:          "ssh-service",
+								AddressFamily: "ipv4",
+								Port:          22,
+								ID:            "16dd23d7-d3ab-42c8-a645-3169f2659a0b",
+								Pools: []string{
+									"49faa4a3-8d0b-4a7a-8bb9-7ed1b5995e49",
+								},
 							},
 						},
 					},
 				}, nil
 			},
-			DoGetPool: func(ctx context.Context, id string) (*lbapi.Pool, error) {
-				return &lbapi.Pool{
-					ID:   "49faa4a3-8d0b-4a7a-8bb9-7ed1b5995e49",
-					Name: "ssh-service-a",
-					Origins: []lbapi.Origin{
-						{
-							ID:        "c0a80101-0000-0000-0000-000000000001",
-							Name:      "svr1-2222",
-							IPAddress: "1.2.3.4",
-							Disabled:  false,
-							Port:      2222,
-						},
-						{
-							ID:        "c0a80101-0000-0000-0000-000000000002",
-							Name:      "svr1-222",
-							IPAddress: "1.2.3.4",
-							Disabled:  false,
-							Port:      222,
-						},
-						{
-							ID:        "c0a80101-0000-0000-0000-000000000003",
-							Name:      "svr2",
-							IPAddress: "4.3.2.1",
-							Disabled:  true,
-							Port:      2222,
+			DoGetPool: func(ctx context.Context, id string) (*lbapi.PoolResponse, error) {
+				return &lbapi.PoolResponse{
+					Pool: lbapi.Pool{
+						ID:   "49faa4a3-8d0b-4a7a-8bb9-7ed1b5995e49",
+						Name: "ssh-service-a",
+						Origins: []lbapi.Origin{
+							{
+								ID:        "c0a80101-0000-0000-0000-000000000001",
+								Name:      "svr1-2222",
+								IPAddress: "1.2.3.4",
+								Disabled:  false,
+								Port:      2222,
+							},
+							{
+								ID:        "c0a80101-0000-0000-0000-000000000002",
+								Name:      "svr1-222",
+								IPAddress: "1.2.3.4",
+								Disabled:  false,
+								Port:      222,
+							},
+							{
+								ID:        "c0a80101-0000-0000-0000-000000000003",
+								Name:      "svr2",
+								IPAddress: "4.3.2.1",
+								Disabled:  true,
+								Port:      2222,
+							},
 						},
 					},
 				}, nil
@@ -198,9 +208,10 @@ func TestUpdateConfigToLatest(t *testing.T) {
 			Logger:          logger,
 			LBClient:        mockLBAPI,
 			DataPlaneClient: mockDataplaneAPI,
+			BaseCfgPath:     testBaseCfgPath,
 		}
 
-		err := mgrCfg.updateConfigToLatest("../../.devcontainer/config/haproxy.cfg", "58622a8d-54a2-4b0c-8b5f-8de7dff29f6f")
+		err := mgrCfg.updateConfigToLatest("58622a8d-54a2-4b0c-8b5f-8de7dff29f6f")
 		require.Nil(t, err)
 
 		expCfg, err := os.ReadFile(fmt.Sprintf("%s/%s", testDataBaseDir, "lb-ex-1-exp.cfg"))

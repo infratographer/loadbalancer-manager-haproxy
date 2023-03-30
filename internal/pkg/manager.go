@@ -28,8 +28,8 @@ var (
 )
 
 type lbAPI interface {
-	GetLoadBalancer(ctx context.Context, id string) (*lbapi.LoadBalancer, error)
-	GetPool(ctx context.Context, id string) (*lbapi.Pool, error)
+	GetLoadBalancer(ctx context.Context, id string) (*lbapi.LoadBalancerResponse, error)
+	GetPool(ctx context.Context, id string) (*lbapi.PoolResponse, error)
 }
 
 type dataPlaneAPI interface {
@@ -44,6 +44,7 @@ type ManagerConfig struct {
 	NatsConn        *nats.Conn
 	DataPlaneClient dataPlaneAPI
 	LBClient        lbAPI
+	BaseCfgPath     string
 
 	// primarily for testing
 	currentConfig string
@@ -57,7 +58,7 @@ func (m *ManagerConfig) Run() error {
 	}
 
 	// use desired config on start
-	if err := m.updateConfigToLatest(viper.GetString("haproxy.config.base")); err != nil {
+	if err := m.updateConfigToLatest(); err != nil {
 		m.Logger.Errorw("failed to initialize the config", zap.Error(err))
 	}
 
@@ -112,7 +113,7 @@ func (m ManagerConfig) processMsg(msg *pubsub.Message) error {
 	}
 
 	lbID := urn.ResourceID.String()
-	if err = m.updateConfigToLatest(viper.GetString("haproxy.config.base"), lbID); err != nil {
+	if err = m.updateConfigToLatest(lbID); err != nil {
 		m.Logger.Errorw("failed to update haproxy config", zap.String("loadbalancer.id", lbID), zap.Error(err))
 		return err
 	}
@@ -121,7 +122,7 @@ func (m ManagerConfig) processMsg(msg *pubsub.Message) error {
 }
 
 // updateConfigToLatest update the haproxy cfg to either baseline or one requested from lbapi with optional lbID param
-func (m *ManagerConfig) updateConfigToLatest(baseCfgPath string, lbID ...string) error {
+func (m *ManagerConfig) updateConfigToLatest(lbID ...string) error {
 	if len(lbID) > 1 {
 		return fmt.Errorf("optional lbID param must be not set or set to a singular loadbalancer ID")
 	}
@@ -129,7 +130,7 @@ func (m *ManagerConfig) updateConfigToLatest(baseCfgPath string, lbID ...string)
 	m.Logger.Info("updating the config")
 
 	// load base config
-	cfg, err := parser.New(options.Path(baseCfgPath), options.NoNamedDefaultsFrom)
+	cfg, err := parser.New(options.Path(m.BaseCfgPath), options.NoNamedDefaultsFrom)
 	if err != nil {
 		m.Logger.Fatalw("failed to load haproxy base config", "error", err)
 	}
@@ -137,23 +138,25 @@ func (m *ManagerConfig) updateConfigToLatest(baseCfgPath string, lbID ...string)
 	if len(lbID) == 1 {
 		// requested a lb id, query lbapi
 		// get desired state
-		lb, err := m.LBClient.GetLoadBalancer(m.Context, lbID[0])
+		lbResp, err := m.LBClient.GetLoadBalancer(m.Context, lbID[0])
 		if err != nil {
 			return err
 		}
 
+		lb := lbResp.LoadBalancer
+
 		// query each pool and store the origins
-		for i, port := range lb.Ports {
+		for i, port := range lbResp.LoadBalancer.Ports {
 			for _, poolID := range port.Pools {
-				p, err := m.LBClient.GetPool(m.Context, poolID)
+				poolResp, err := m.LBClient.GetPool(m.Context, poolID)
 				if err != nil {
 					return err
 				}
 
 				data := lbapi.Pool{
 					ID:      poolID,
-					Name:    p.Name,
-					Origins: p.Origins,
+					Name:    poolResp.Pool.Name,
+					Origins: poolResp.Pool.Origins,
 				}
 
 				lb.Ports[i].PoolData = append(port.PoolData, data)
@@ -161,7 +164,7 @@ func (m *ManagerConfig) updateConfigToLatest(baseCfgPath string, lbID ...string)
 		}
 
 		// merge response
-		cfg, err = mergeConfig(cfg, lb)
+		cfg, err = mergeConfig(cfg, &lb)
 		if err != nil {
 			return err
 		}
