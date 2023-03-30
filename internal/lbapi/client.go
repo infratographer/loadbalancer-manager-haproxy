@@ -39,6 +39,7 @@ func NewClient(url string, opts ...func(*Client)) *Client {
 	return c
 }
 
+// GetLoadBalancer returns a load balancer by id
 func (c Client) GetLoadBalancer(ctx context.Context, id string) (*LoadBalancer, error) {
 	lb := &LoadBalancer{}
 	url := fmt.Sprintf("%s/%s/loadbalancers/%s", c.baseURL, apiVersion, id)
@@ -76,6 +77,7 @@ func (c Client) GetLoadBalancer(ctx context.Context, id string) (*LoadBalancer, 
 	return lb, nil
 }
 
+// GetPool returns a load balancer pool  by id
 func (c Client) GetPool(ctx context.Context, id string) (*Pool, error) {
 	pool := &Pool{}
 	url := fmt.Sprintf("%s/%s/loadbalancers/pools/%s", c.baseURL, apiVersion, id)
