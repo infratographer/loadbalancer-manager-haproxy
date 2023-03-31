@@ -9,7 +9,7 @@ import (
 
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/dataplaneapi"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/lbapi"
-	"go.infratographer.com/loadbalancer-manager-haproxy/internal/pkg"
+	"go.infratographer.com/loadbalancer-manager-haproxy/internal/manager"
 
 	"github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
@@ -81,7 +81,7 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 	dpc := dataplaneapi.NewClient(viper.GetString("dataplane.url"))
 	lbc := lbapi.NewClient(viper.GetString("loadbalancerapi.url"))
 
-	mgr := &pkg.ManagerConfig{
+	mgr := &manager.Config{
 		Context:         ctx,
 		Logger:          logger,
 		NatsConn:        natsConn,

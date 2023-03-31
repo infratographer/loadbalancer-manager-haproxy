@@ -1,4 +1,4 @@
-package pkg
+package manager
 
 import (
 	"context"
@@ -37,36 +37,8 @@ type dataPlaneAPI interface {
 	ApiIsReady(ctx context.Context) bool
 }
 
-// TODO: move from pkg to internal/manager package
-type Origin struct {
-	ID        string
-	Name      string
-	IPAddress string
-	Disabled  bool
-	Port      int64
-}
-
-type Pool struct {
-	ID      string
-	Name    string
-	Origins []Origin
-}
-
-type Port struct {
-	AddressFamily string
-	ID            string
-	Name          string
-	Port          int64
-	Pools         []Pool
-}
-
-type LoadBalancer struct {
-	ID    string
-	Ports []Port
-}
-
-// ManagerConfig contains configuration and client connections
-type ManagerConfig struct {
+// Config contains configuration and client connections
+type Config struct {
 	Context         context.Context
 	Logger          *zap.SugaredLogger
 	NatsConn        *nats.Conn
@@ -79,7 +51,7 @@ type ManagerConfig struct {
 }
 
 // Run subscribes to a NATS subject and updates the haproxy config via dataplaneapi
-func (m *ManagerConfig) Run() error {
+func (m *Config) Run() error {
 	// wait until the Data Plane API is running
 	if err := m.waitForDataPlaneReady(dataPlaneAPIRetryLimit, dataPlaneAPIRetrySleep); err != nil {
 		m.Logger.Fatal("unable to reach dataplaneapi. is it running?")
@@ -127,7 +99,7 @@ func (m *ManagerConfig) Run() error {
 }
 
 // processMsg message handler
-func (m ManagerConfig) processMsg(msg *pubsub.Message) error {
+func (m Config) processMsg(msg *pubsub.Message) error {
 	pubsubMsg := pubsubx.Message{}
 	if err := json.Unmarshal(msg.Body, &pubsubMsg); err != nil {
 		m.Logger.Errorw("failed to process data in msg", zap.Error(err))
@@ -150,7 +122,7 @@ func (m ManagerConfig) processMsg(msg *pubsub.Message) error {
 }
 
 // updateConfigToLatest update the haproxy cfg to either baseline or one requested from lbapi with optional lbID param
-func (m *ManagerConfig) updateConfigToLatest(lbID ...string) error {
+func (m *Config) updateConfigToLatest(lbID ...string) error {
 	if len(lbID) > 1 {
 		return fmt.Errorf("optional lbID param must be not set or set to a singular loadbalancer ID")
 	}
@@ -171,32 +143,32 @@ func (m *ManagerConfig) updateConfigToLatest(lbID ...string) error {
 			return err
 		}
 
-		lb := LoadBalancer{
+		lb := loadBalancer{
 			ID: lbResp.LoadBalancer.ID,
 		}
 
 		// translate responses, populate data structure
-		for i, port := range lbResp.LoadBalancer.Ports {
-			lb.Ports = append(lb.Ports, Port{
-				AddressFamily: port.AddressFamily,
-				ID:            port.ID,
-				Name:          port.Name,
-				Port:          port.Port,
+		for i, p := range lbResp.LoadBalancer.Ports {
+			lb.Ports = append(lb.Ports, port{
+				AddressFamily: p.AddressFamily,
+				ID:            p.ID,
+				Name:          p.Name,
+				Port:          p.Port,
 			})
 
-			for _, poolID := range port.Pools {
+			for _, poolID := range p.Pools {
 				poolResp, err := m.LBClient.GetPool(m.Context, poolID)
 				if err != nil {
 					return err
 				}
 
-				data := Pool{
+				data := pool{
 					ID:   poolID,
 					Name: poolResp.Pool.Name,
 				}
 
 				for _, o := range poolResp.Pool.Origins {
-					data.Origins = append(data.Origins, Origin{
+					data.Origins = append(data.Origins, origin{
 						ID:        o.ID,
 						Name:      o.Name,
 						IPAddress: o.IPAddress,
@@ -227,7 +199,7 @@ func (m *ManagerConfig) updateConfigToLatest(lbID ...string) error {
 	return nil
 }
 
-func (m ManagerConfig) waitForDataPlaneReady(retries int, sleep time.Duration) error {
+func (m Config) waitForDataPlaneReady(retries int, sleep time.Duration) error {
 	for i := 0; i < retries; i++ {
 		if m.DataPlaneClient.ApiIsReady(m.Context) {
 			m.Logger.Info("dataplaneapi is ready")
@@ -242,7 +214,7 @@ func (m ManagerConfig) waitForDataPlaneReady(retries int, sleep time.Duration) e
 }
 
 // mergeConfig takes the response from lb api, merges with the base haproxy config and returns it
-func mergeConfig(cfg parser.Parser, lb *LoadBalancer) (parser.Parser, error) {
+func mergeConfig(cfg parser.Parser, lb *loadBalancer) (parser.Parser, error) {
 	for _, p := range lb.Ports {
 		// create port
 		if err := cfg.SectionsCreate(parser.Frontends, p.Name); err != nil {
