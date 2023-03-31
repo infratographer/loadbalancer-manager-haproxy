@@ -69,13 +69,13 @@ func TestUpdateConfigToLatest(t *testing.T) {
 			},
 		}
 
-		mgrCfg := Config{
+		mgr := Manager{
 			Logger:      logger,
 			LBClient:    mockLBAPI,
 			BaseCfgPath: testBaseCfgPath,
 		}
 
-		err := mgrCfg.updateConfigToLatest("58622a8d-54a2-4b0c-8b5f-8de7dff29f6f")
+		err := mgr.updateConfigToLatest("58622a8d-54a2-4b0c-8b5f-8de7dff29f6f")
 		assert.NotNil(t, err)
 	})
 
@@ -105,13 +105,13 @@ func TestUpdateConfigToLatest(t *testing.T) {
 			},
 		}
 
-		mgrCfg := Config{
+		mgr := Manager{
 			Logger:      logger,
 			LBClient:    mockLBAPI,
 			BaseCfgPath: testBaseCfgPath,
 		}
 
-		err := mgrCfg.updateConfigToLatest("58622a8d-54a2-4b0c-8b5f-8de7dff29f6f")
+		err := mgr.updateConfigToLatest("58622a8d-54a2-4b0c-8b5f-8de7dff29f6f")
 		assert.NotNil(t, err)
 	})
 
@@ -124,13 +124,13 @@ func TestUpdateConfigToLatest(t *testing.T) {
 			},
 		}
 
-		mgrCfg := Config{
+		mgr := Manager{
 			Logger:          logger,
 			DataPlaneClient: mockDataplaneAPI,
 			BaseCfgPath:     testBaseCfgPath,
 		}
 
-		err := mgrCfg.updateConfigToLatest()
+		err := mgr.updateConfigToLatest()
 		require.Nil(t, err)
 
 		contents, err := os.ReadFile(testBaseCfgPath)
@@ -138,9 +138,9 @@ func TestUpdateConfigToLatest(t *testing.T) {
 
 		// remove that 'unnamed_defaults_1' thing the haproxy parser library puts in the default section,
 		// even though the library is configured to not include default section labels
-		mgrCfg.currentConfig = strings.Replace(mgrCfg.currentConfig, " unnamed_defaults_1", "", -1)
+		mgr.currentConfig = strings.Replace(mgr.currentConfig, " unnamed_defaults_1", "", -1)
 
-		assert.Equal(t, strings.TrimSpace(string(contents)), strings.TrimSpace(mgrCfg.currentConfig))
+		assert.Equal(t, strings.TrimSpace(string(contents)), strings.TrimSpace(mgr.currentConfig))
 	})
 
 	t.Run("successfully queries lb api and merges changes with base config", func(t *testing.T) {
@@ -204,20 +204,20 @@ func TestUpdateConfigToLatest(t *testing.T) {
 			},
 		}
 
-		mgrCfg := Config{
+		mgr := Manager{
 			Logger:          logger,
 			LBClient:        mockLBAPI,
 			DataPlaneClient: mockDataplaneAPI,
 			BaseCfgPath:     testBaseCfgPath,
 		}
 
-		err := mgrCfg.updateConfigToLatest("58622a8d-54a2-4b0c-8b5f-8de7dff29f6f")
+		err := mgr.updateConfigToLatest("58622a8d-54a2-4b0c-8b5f-8de7dff29f6f")
 		require.Nil(t, err)
 
 		expCfg, err := os.ReadFile(fmt.Sprintf("%s/%s", testDataBaseDir, "lb-ex-1-exp.cfg"))
 		require.Nil(t, err)
 
-		assert.Equal(t, strings.TrimSpace(string(expCfg)), strings.TrimSpace(mgrCfg.currentConfig))
+		assert.Equal(t, strings.TrimSpace(string(expCfg)), strings.TrimSpace(mgr.currentConfig))
 	})
 }
 

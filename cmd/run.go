@@ -81,7 +81,7 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 	dpc := dataplaneapi.NewClient(viper.GetString("dataplane.url"))
 	lbc := lbapi.NewClient(viper.GetString("loadbalancerapi.url"))
 
-	mgr := &manager.Config{
+	mgr := &manager.Manager{
 		Context:         ctx,
 		Logger:          logger,
 		NatsConn:        natsConn,

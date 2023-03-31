@@ -37,8 +37,8 @@ type dataPlaneAPI interface {
 	ApiIsReady(ctx context.Context) bool
 }
 
-// Config contains configuration and client connections
-type Config struct {
+// Manager contains configuration and client connections
+type Manager struct {
 	Context         context.Context
 	Logger          *zap.SugaredLogger
 	NatsConn        *nats.Conn
@@ -51,7 +51,7 @@ type Config struct {
 }
 
 // Run subscribes to a NATS subject and updates the haproxy config via dataplaneapi
-func (m *Config) Run() error {
+func (m *Manager) Run() error {
 	// wait until the Data Plane API is running
 	if err := m.waitForDataPlaneReady(dataPlaneAPIRetryLimit, dataPlaneAPIRetrySleep); err != nil {
 		m.Logger.Fatal("unable to reach dataplaneapi. is it running?")
@@ -93,13 +93,13 @@ func (m *Config) Run() error {
 
 		_ = m.processMsg(msg)
 
-		// TODO - @rizzza - √√ on this ack with Tyler. We ack everything? nack is fatal with this driver.
+		// TODO - @rizzza - For now, we ack everything. nack is fatal with this driver.
 		msg.Ack()
 	}
 }
 
 // processMsg message handler
-func (m Config) processMsg(msg *pubsub.Message) error {
+func (m Manager) processMsg(msg *pubsub.Message) error {
 	pubsubMsg := pubsubx.Message{}
 	if err := json.Unmarshal(msg.Body, &pubsubMsg); err != nil {
 		m.Logger.Errorw("failed to process data in msg", zap.Error(err))
@@ -122,7 +122,7 @@ func (m Config) processMsg(msg *pubsub.Message) error {
 }
 
 // updateConfigToLatest update the haproxy cfg to either baseline or one requested from lbapi with optional lbID param
-func (m *Config) updateConfigToLatest(lbID ...string) error {
+func (m *Manager) updateConfigToLatest(lbID ...string) error {
 	if len(lbID) > 1 {
 		return fmt.Errorf("optional lbID param must be not set or set to a singular loadbalancer ID")
 	}
@@ -199,7 +199,7 @@ func (m *Config) updateConfigToLatest(lbID ...string) error {
 	return nil
 }
 
-func (m Config) waitForDataPlaneReady(retries int, sleep time.Duration) error {
+func (m Manager) waitForDataPlaneReady(retries int, sleep time.Duration) error {
 	for i := 0; i < retries; i++ {
 		if m.DataPlaneClient.ApiIsReady(m.Context) {
 			m.Logger.Info("dataplaneapi is ready")
