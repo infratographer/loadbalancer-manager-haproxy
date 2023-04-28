@@ -34,7 +34,7 @@ type lbAPI interface {
 
 type dataPlaneAPI interface {
 	PostConfig(ctx context.Context, config string) error
-	ApiIsReady(ctx context.Context) bool
+	APIIsReady(ctx context.Context) bool
 }
 
 // Manager contains configuration and client connections
@@ -124,7 +124,7 @@ func (m Manager) processMsg(msg *pubsub.Message) error {
 // updateConfigToLatest update the haproxy cfg to either baseline or one requested from lbapi with optional lbID param
 func (m *Manager) updateConfigToLatest(lbID ...string) error {
 	if len(lbID) > 1 {
-		return fmt.Errorf("optional lbID param must be not set or set to a singular loadbalancer ID")
+		return errInvalidLBID
 	}
 
 	m.Logger.Info("updating the config")
@@ -201,7 +201,7 @@ func (m *Manager) updateConfigToLatest(lbID ...string) error {
 
 func (m Manager) waitForDataPlaneReady(retries int, sleep time.Duration) error {
 	for i := 0; i < retries; i++ {
-		if m.DataPlaneClient.ApiIsReady(m.Context) {
+		if m.DataPlaneClient.APIIsReady(m.Context) {
 			m.Logger.Info("dataplaneapi is ready")
 			return nil
 		}
@@ -218,22 +218,22 @@ func mergeConfig(cfg parser.Parser, lb *loadBalancer) (parser.Parser, error) {
 	for _, p := range lb.Ports {
 		// create port
 		if err := cfg.SectionsCreate(parser.Frontends, p.Name); err != nil {
-			return nil, fmt.Errorf("failed to create frontend section with label %q: %v", p.Name, err)
+			return nil, newLabelError(p.Name, errFrontendSectionLabelFailure, err)
 		}
 
 		if err := cfg.Insert(parser.Frontends, p.Name, "bind", types.Bind{
 			Path: fmt.Sprintf("%s@:%d", p.AddressFamily, p.Port)}); err != nil {
-			return nil, fmt.Errorf("failed to create frontend attr bind: %v", err)
+			return nil, newAttrError(errFrontendBindFailure, err)
 		}
 
 		// map frontend to backend
 		if err := cfg.Set(parser.Frontends, p.Name, "use_backend", types.UseBackend{Name: p.Name}); err != nil {
-			return nil, fmt.Errorf("failed to create frontend attr use_backend: %v", err)
+			return nil, newAttrError(errUseBackendFailure, err)
 		}
 
 		// create backend
 		if err := cfg.SectionsCreate(parser.Backends, p.Name); err != nil {
-			return nil, fmt.Errorf("failed to create section backend with label %q': %v", p.Name, err)
+			return nil, newLabelError(p.Name, errBackendSectionLabelFailure, err)
 		}
 
 		for _, pool := range p.Pools {
@@ -250,7 +250,7 @@ func mergeConfig(cfg parser.Parser, lb *loadBalancer) (parser.Parser, error) {
 				}
 
 				if err := cfg.Set(parser.Backends, p.Name, "server", srvr); err != nil {
-					return nil, fmt.Errorf("failed to add backend %q attr server: %v", p.Name, err)
+					return nil, newLabelError(p.Name, errBackendServerFailure, err)
 				}
 			}
 		}

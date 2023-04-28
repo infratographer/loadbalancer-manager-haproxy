@@ -27,8 +27,8 @@ func NewClient(url string) *Client {
 	}
 }
 
-// ApiIsReady returns true when a 200 is returned for a GET request to the Data Plane API
-func (c *Client) ApiIsReady(ctx context.Context) bool {
+// APIIsReady returns true when a 200 is returned for a GET request to the Data Plane API
+func (c *Client) APIIsReady(ctx context.Context) bool {
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL, nil)
 	req.SetBasicAuth(viper.GetString("dataplane.user.name"), viper.GetString("dataplane.user.pwd"))
 

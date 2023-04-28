@@ -18,6 +18,7 @@ func newLBAPIMock(respJSON string, respCode int) *mock.HTTPClient {
 		json := respJSON
 
 		r := io.NopCloser(strings.NewReader(json))
+
 		return &http.Response{
 			StatusCode: respCode,
 			Body:       r,

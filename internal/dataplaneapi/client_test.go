@@ -63,7 +63,7 @@ func TestAPIIsReady(t *testing.T) {
 		baseURL: "http://localhost:5555/v2",
 	}
 
-	ready := dc.ApiIsReady(context.TODO())
+	ready := dc.APIIsReady(context.TODO())
 	if !ready {
 		t.Error("expected dataplane api readiness to be true, got:", ready)
 	}
@@ -80,7 +80,7 @@ func TestAPIIsReady(t *testing.T) {
 		baseURL: "http://localhost:5555/v2",
 	}
 
-	ready = dc.ApiIsReady(context.TODO())
+	ready = dc.APIIsReady(context.TODO())
 	if ready {
 		t.Error("expected dataplane api readiness to be false, got:", ready)
 	}

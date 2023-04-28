@@ -1,4 +1,3 @@
-// lbapi TODO: will move to https://github.com/infratographer/load-balancer-api
 package lbapi
 
 import (
@@ -13,7 +12,8 @@ import (
 )
 
 const (
-	apiVersion = "v1"
+	apiVersion           = "v1"
+	clientTimeoutSeconds = 5
 )
 
 // HTTPClient interface
@@ -32,7 +32,7 @@ func NewClient(url string, opts ...func(*Client)) *Client {
 	// default retryable http client
 	retryCli := retryablehttp.NewClient()
 	retryCli.RetryMax = 3
-	retryCli.HTTPClient.Timeout = time.Second * 5
+	retryCli.HTTPClient.Timeout = time.Second * time.Duration(clientTimeoutSeconds)
 	retryCli.Logger = nil
 
 	c := &Client{
@@ -73,7 +73,7 @@ func (c Client) GetLoadBalancer(ctx context.Context, id string) (*LoadBalancerRe
 	switch resp.StatusCode {
 	case http.StatusOK:
 		if err := json.NewDecoder(resp.Body).Decode(lb); err != nil {
-			return nil, fmt.Errorf("failed to decode load balancer: %v", err)
+			return nil, newError(errDecodeLB, err)
 		}
 	case http.StatusNotFound:
 		return nil, ErrLBHTTPNotfound
@@ -84,8 +84,9 @@ func (c Client) GetLoadBalancer(ctx context.Context, id string) (*LoadBalancerRe
 	default:
 		b, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read resp body")
+			return nil, errReadResponse
 		}
+
 		return nil, fmt.Errorf("%s: %w", fmt.Sprintf("StatusCode (%d) - %s ", resp.StatusCode, string(b)), ErrLBHTTPError)
 	}
 
@@ -111,7 +112,7 @@ func (c Client) GetPool(ctx context.Context, id string) (*PoolResponse, error) {
 	switch resp.StatusCode {
 	case http.StatusOK:
 		if err := json.NewDecoder(resp.Body).Decode(pool); err != nil {
-			return nil, fmt.Errorf("failed to decode load balancer: %v", err)
+			return nil, newError(errDecodeLB, err)
 		}
 	case http.StatusNotFound:
 		return nil, ErrLBHTTPNotfound
@@ -122,8 +123,9 @@ func (c Client) GetPool(ctx context.Context, id string) (*PoolResponse, error) {
 	default:
 		b, err := io.ReadAll(resp.Body)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read resp body")
+			return nil, errReadResponse
 		}
+
 		return nil, fmt.Errorf("%s: %w", fmt.Sprintf("StatusCode (%d) - %s ", resp.StatusCode, string(b)), ErrLBHTTPError)
 	}
 
