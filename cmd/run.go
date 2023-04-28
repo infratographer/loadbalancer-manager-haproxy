@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/dataplaneapi"
-	"go.infratographer.com/loadbalancer-manager-haproxy/internal/lbapi"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/manager"
+	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
 
 	"github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"

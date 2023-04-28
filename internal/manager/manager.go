@@ -13,7 +13,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/spf13/viper"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/dataplaneapi"
-	"go.infratographer.com/loadbalancer-manager-haproxy/internal/lbapi"
+	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
 
 	"go.infratographer.com/x/pubsubx"
 	"go.infratographer.com/x/urnx"

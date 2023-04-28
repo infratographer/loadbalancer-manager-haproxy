@@ -11,8 +11,8 @@ import (
 	"github.com/haproxytech/config-parser/v4/options"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.infratographer.com/loadbalancer-manager-haproxy/internal/lbapi"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/manager/mock"
+	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
 	"go.uber.org/zap"
 )
 

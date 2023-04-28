@@ -21,11 +21,13 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+// Client creates a new lb api client against a specific endpoint
 type Client struct {
 	client  HTTPClient
 	baseURL string
 }
 
+// NewClient creates a new lb api client
 func NewClient(url string, opts ...func(*Client)) *Client {
 	// default retryable http client
 	retryCli := retryablehttp.NewClient()

@@ -3,7 +3,7 @@ package mock
 import (
 	"context"
 
-	"go.infratographer.com/loadbalancer-manager-haproxy/internal/lbapi"
+	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
 )
 
 // LBAPIClient mock client
