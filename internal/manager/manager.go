@@ -15,8 +15,8 @@ import (
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/dataplaneapi"
 	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
 
+	"go.infratographer.com/x/gidx"
 	"go.infratographer.com/x/pubsubx"
-	"go.infratographer.com/x/urnx"
 	"go.uber.org/zap"
 	"gocloud.dev/pubsub"
 	"gocloud.dev/pubsub/natspubsub"
@@ -98,24 +98,43 @@ func (m *Manager) Run() error {
 	}
 }
 
+const (
+	EventTypeCreate = "create"
+	EventTypeUpdate = "update"
+)
+
 // processMsg message handler
 func (m Manager) processMsg(msg *pubsub.Message) error {
-	pubsubMsg := pubsubx.Message{}
+	pubsubMsg := pubsubx.ChangeMessage{}
 	if err := json.Unmarshal(msg.Body, &pubsubMsg); err != nil {
 		m.Logger.Errorw("failed to process data in msg", zap.Error(err))
 		return err
 	}
 
-	urn, err := urnx.Parse(pubsubMsg.SubjectURN)
-	if err != nil {
-		m.Logger.Errorw("failed to parse pubsub msg urn", zap.String("subjectURN", pubsubMsg.SubjectURN), zap.Error(err))
-		return err
-	}
+	switch pubsubMsg.EventType {
+	case EventTypeCreate:
+		fallthrough
+	case EventTypeUpdate:
+		// parse subject ID, which will be (in this case) the loadbalancerID
+		// TODO - @rizzza - support multiple subjects, migrate to nats libs, unit tests, new lbapi client
+		lbID, err := gidx.Parse(string(pubsubMsg.SubjectID))
+		if err != nil {
+			m.Logger.Errorw("failed to parse pubsub msg gidx subjectID",
+				zap.String("subjectID", pubsubMsg.SubjectID.String()),
+				zap.Error(err))
 
-	lbID := urn.ResourceID.String()
-	if err = m.updateConfigToLatest(lbID); err != nil {
-		m.Logger.Errorw("failed to update haproxy config", zap.String("loadbalancer.id", lbID), zap.Error(err))
-		return err
+			return err
+		}
+
+		if err = m.updateConfigToLatest(lbID.String()); err != nil {
+			m.Logger.Errorw("failed to update haproxy config",
+				zap.String("loadbalancer.id", lbID.String()),
+				zap.Error(err))
+
+			return err
+		}
+	default:
+		return nil
 	}
 
 	return nil
