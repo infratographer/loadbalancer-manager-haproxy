@@ -6,7 +6,7 @@ require (
 	github.com/haproxytech/config-parser/v4 v4.1.0
 	github.com/hashicorp/go-retryablehttp v0.7.2
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/nats-io/nats.go v1.21.0
+	github.com/nats-io/nats.go v1.25.0
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
@@ -14,7 +14,6 @@ require (
 	go.infratographer.com/x v0.0.13
 	go.uber.org/zap v1.24.0
 	gocloud.dev v0.27.0
-	gocloud.dev/pubsub/natspubsub v0.27.0
 )
 
 require (
@@ -31,8 +30,10 @@ require (
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jaevor/go-nanoid v1.3.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
+	github.com/minio/highwayhash v1.0.2 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
-	github.com/nats-io/nkeys v0.3.0 // indirect
+	github.com/nats-io/nats-server/v2 v2.7.2 // indirect
+	github.com/nats-io/nkeys v0.4.4 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

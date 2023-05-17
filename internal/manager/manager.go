@@ -3,7 +3,6 @@ package manager
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"time"
 
@@ -18,8 +17,6 @@ import (
 	"go.infratographer.com/x/gidx"
 	"go.infratographer.com/x/pubsubx"
 	"go.uber.org/zap"
-	"gocloud.dev/pubsub"
-	"gocloud.dev/pubsub/natspubsub"
 )
 
 var (
@@ -52,49 +49,59 @@ type Manager struct {
 
 // Run subscribes to a NATS subject and updates the haproxy config via dataplaneapi
 func (m *Manager) Run() error {
-	// wait until the Data Plane API is running
-	if err := m.waitForDataPlaneReady(dataPlaneAPIRetryLimit, dataPlaneAPIRetrySleep); err != nil {
-		m.Logger.Fatal("unable to reach dataplaneapi. is it running?")
-	}
-
-	// use desired config on start
-	if err := m.updateConfigToLatest(); err != nil {
-		m.Logger.Errorw("failed to initialize the config", zap.Error(err))
-	}
-
-	// subscribe to nats queue -> update config to latest on msg receive
-	subject := viper.GetString("nats.subject")
-
-	subscription, err := natspubsub.OpenSubscription(m.NatsConn, subject, nil)
-	if err != nil {
-		// TODO - update
-		m.Logger.Errorw("failed to subscribe to queue ", zap.String("subject", subject))
-		return err
-	}
-
-	m.Logger.Infow("subscribed to NATS subject ", zap.String("subject", subject))
+	subscriptions := []*nats.Subscription{}
+	msgBus := make(chan *nats.Msg)
 
 	defer func() {
-		_ = subscription.Shutdown(m.Context)
+		m.Logger.Info("Unsubscribing from nats subscriptions...")
+
+		for _, s := range subscriptions {
+			_ = s.Unsubscribe()
+		}
 	}()
 
-	for {
-		msg, err := subscription.Receive(m.Context)
+	// // wait until the Data Plane API is running
+	// if err := m.waitForDataPlaneReady(dataPlaneAPIRetryLimit, dataPlaneAPIRetrySleep); err != nil {
+	// 	m.Logger.Fatal("unable to reach dataplaneapi. is it running?")
+	// }
+
+	// // use desired config on start
+	// if err := m.updateConfigToLatest(); err != nil {
+	// 	m.Logger.Errorw("failed to initialize the config", zap.Error(err))
+	// }
+
+	// subscribe to nats subjects -> update config to latest on msg receive
+	subjects := viper.GetStringSlice("nats.subjects")
+	prefix := viper.GetString("nats.subject-prefix")
+
+	for _, subject := range subjects {
+		prefixedSubjectQueue := fmt.Sprintf("%s.%s", prefix, subject)
+
+		subscription, err := m.NatsConn.ChanSubscribe(prefixedSubjectQueue, msgBus)
 		if err != nil {
-			if errors.Is(err, context.Canceled) {
-				m.Logger.Info("context canceled")
-				return nil
-			}
-
-			m.Logger.Error("failed receiving nats message")
-
+			m.Logger.Errorw("failed to subscribe to queue ", zap.String("subject", prefixedSubjectQueue))
 			return err
 		}
 
-		_ = m.processMsg(msg)
+		subscriptions = append(subscriptions, subscription)
 
-		// TODO - @rizzza - For now, we ack everything. nack is fatal with this driver.
-		msg.Ack()
+		m.Logger.Infow("subscribed to NATS subject ", zap.String("subject", subject))
+	}
+
+	for {
+		select {
+		case <-m.Context.Done():
+			return nil
+		case msg := <-msgBus:
+			if err := m.processMsg(msg); err != nil {
+				return err
+			} else {
+				if err := msg.Ack(); err != nil {
+					m.Logger.Errorw("failed to ack received msg", zap.Error(err))
+					return err
+				}
+			}
+		}
 	}
 }
 
@@ -104,9 +111,9 @@ const (
 )
 
 // processMsg message handler
-func (m Manager) processMsg(msg *pubsub.Message) error {
+func (m Manager) processMsg(msg *nats.Msg) error {
 	pubsubMsg := pubsubx.ChangeMessage{}
-	if err := json.Unmarshal(msg.Body, &pubsubMsg); err != nil {
+	if err := json.Unmarshal(msg.Data, &pubsubMsg); err != nil {
 		m.Logger.Errorw("failed to process data in msg", zap.Error(err))
 		return err
 	}
@@ -126,13 +133,15 @@ func (m Manager) processMsg(msg *pubsub.Message) error {
 			return err
 		}
 
-		if err = m.updateConfigToLatest(lbID.String()); err != nil {
-			m.Logger.Errorw("failed to update haproxy config",
-				zap.String("loadbalancer.id", lbID.String()),
-				zap.Error(err))
+		// if err = m.updateConfigToLatest(lbID.String()); err != nil {
+		// 	m.Logger.Errorw("failed to update haproxy config",
+		// 		zap.String("loadbalancer.id", lbID.String()),
+		// 		zap.Error(err))
 
-			return err
-		}
+		// 	return err
+		// }
+
+		m.Logger.Infof("MJS: received msg of type create|update for lb %s", lbID)
 	default:
 		return nil
 	}

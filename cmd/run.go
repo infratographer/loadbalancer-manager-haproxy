@@ -34,8 +34,11 @@ func init() {
 	runCmd.PersistentFlags().String("nats-creds", "", "Path to the file containing the NATS credentials")
 	viperBindFlag("nats.creds", runCmd.PersistentFlags().Lookup("nats-creds"))
 
-	runCmd.PersistentFlags().String("nats-subject", "loadbalancer-manager-haproxy", "NATS subject to subscribe to")
-	viperBindFlag("nats.subject", runCmd.PersistentFlags().Lookup("nats-subject"))
+	runCmd.PersistentFlags().String("nats-subject-prefix", "com.infratographer", "prefix for NATS subjects")
+	viperBindFlag("nats.subject-prefix", runCmd.PersistentFlags().Lookup("nats-subject-prefix"))
+
+	runCmd.PersistentFlags().StringSlice("nats-subjects", []string{"changes.*.load-balancer"}, "NATS subjects to subscribe to")
+	viperBindFlag("nats.subjects", runCmd.PersistentFlags().Lookup("nats-subjects"))
 
 	runCmd.PersistentFlags().String("dataplane-user-name", "haproxy", "DataplaneAPI user name")
 	viperBindFlag("dataplane.user.name", runCmd.PersistentFlags().Lookup("dataplane-user-name"))
@@ -72,10 +75,17 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 		viper.GetString("nats.url"),
 		nats.UserCredentials(viper.GetString("nats.creds")),
 	)
+
 	if err != nil {
 		logger.Fatalw("failed connecting to nats", "error", err)
 	}
-	defer natsConn.Close()
+
+	defer func() {
+		if !natsConn.IsClosed() {
+			logger.Info("Shutting down nats connection...")
+			natsConn.Close()
+		}
+	}()
 
 	// init other components
 	dpc := dataplaneapi.NewClient(viper.GetString("dataplane.url"))
@@ -107,6 +117,10 @@ func validateMandatoryFlags() error {
 
 	if viper.GetString("nats.creds") == "" {
 		errs = append(errs, ErrNATSAuthRequired.Error())
+	}
+
+	if viper.GetString("nats.subject-prefix") == "" {
+		errs = append(errs, ErrNATSSubjectPrefixRequired.Error())
 	}
 
 	if viper.GetString("haproxy.config.base") == "" {
