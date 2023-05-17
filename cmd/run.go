@@ -9,9 +9,10 @@ import (
 
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/dataplaneapi"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/manager"
+	"go.infratographer.com/loadbalancer-manager-haproxy/internal/pubsub"
 	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
+	"go.uber.org/zap"
 
-	"github.com/nats-io/nats.go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -71,34 +72,46 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 		cancel()
 	}()
 
-	natsConn, err := nats.Connect(
-		viper.GetString("nats.url"),
-		nats.UserCredentials(viper.GetString("nats.creds")),
-	)
-
-	if err != nil {
-		logger.Fatalw("failed connecting to nats", "error", err)
-	}
-
-	defer func() {
-		if !natsConn.IsClosed() {
-			logger.Info("Shutting down nats connection...")
-			natsConn.Close()
-		}
-	}()
-
 	// init other components
 	dpc := dataplaneapi.NewClient(viper.GetString("dataplane.url"))
 	lbc := lbapi.NewClient(viper.GetString("loadbalancerapi.url"))
 
+	// setup, connect to nats and subscribe to subjects
+	natsClient := pubsub.NewNatsClient(ctx, viper.GetString("nats.url"),
+		pubsub.WithUserCredentials(viper.GetString("nats.creds")),
+		pubsub.WithLogger(logger),
+	)
+
+	if err := natsClient.Connect(); err != nil {
+		logger.Error("failed to connect to nats server", zap.Error(err))
+		return err
+	}
+
+	subjects := viper.GetStringSlice("nats.subjects")
+	prefix := viper.GetString("nats.subject-prefix")
+
+	for _, subject := range subjects {
+		prefixedSubjectQueue := fmt.Sprintf("%s.%s", prefix, subject)
+		if err := natsClient.Subscribe(prefixedSubjectQueue); err != nil {
+			logger.Errorw("failed to subscribe to queue ", zap.String("subject", prefixedSubjectQueue))
+			return err
+		}
+	}
+
 	mgr := &manager.Manager{
 		Context:         ctx,
 		Logger:          logger,
-		NatsConn:        natsConn,
+		NatsClient:      natsClient,
 		DataPlaneClient: dpc,
 		LBClient:        lbc,
 		BaseCfgPath:     viper.GetString("haproxy.config.base"),
 	}
+
+	defer func() {
+		if err := mgr.NatsClient.Close(); err != nil {
+			mgr.Logger.Errorw("failed to shutdown nats client", zap.Error(err))
+		}
+	}()
 
 	if err := mgr.Run(); err != nil {
 		logger.Fatalw("failed starting manager", "error", err)

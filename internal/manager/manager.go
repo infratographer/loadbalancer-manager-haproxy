@@ -10,8 +10,8 @@ import (
 	"github.com/haproxytech/config-parser/v4/options"
 	"github.com/haproxytech/config-parser/v4/types"
 	"github.com/nats-io/nats.go"
-	"github.com/spf13/viper"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/dataplaneapi"
+	"go.infratographer.com/loadbalancer-manager-haproxy/internal/pubsub"
 	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
 
 	"go.infratographer.com/x/gidx"
@@ -38,7 +38,7 @@ type dataPlaneAPI interface {
 type Manager struct {
 	Context         context.Context
 	Logger          *zap.SugaredLogger
-	NatsConn        *nats.Conn
+	NatsClient      *pubsub.NatsClient
 	DataPlaneClient dataPlaneAPI
 	LBClient        lbAPI
 	BaseCfgPath     string
@@ -49,16 +49,7 @@ type Manager struct {
 
 // Run subscribes to a NATS subject and updates the haproxy config via dataplaneapi
 func (m *Manager) Run() error {
-	subscriptions := []*nats.Subscription{}
-	msgBus := make(chan *nats.Msg)
-
-	defer func() {
-		m.Logger.Info("Unsubscribing from nats subscriptions...")
-
-		for _, s := range subscriptions {
-			_ = s.Unsubscribe()
-		}
-	}()
+	m.Logger.Info("Starting manager")
 
 	// // wait until the Data Plane API is running
 	// if err := m.waitForDataPlaneReady(dataPlaneAPIRetryLimit, dataPlaneAPIRetrySleep); err != nil {
@@ -70,34 +61,17 @@ func (m *Manager) Run() error {
 	// 	m.Logger.Errorw("failed to initialize the config", zap.Error(err))
 	// }
 
-	// subscribe to nats subjects -> update config to latest on msg receive
-	subjects := viper.GetStringSlice("nats.subjects")
-	prefix := viper.GetString("nats.subject-prefix")
-
-	for _, subject := range subjects {
-		prefixedSubjectQueue := fmt.Sprintf("%s.%s", prefix, subject)
-
-		subscription, err := m.NatsConn.ChanSubscribe(prefixedSubjectQueue, msgBus)
-		if err != nil {
-			m.Logger.Errorw("failed to subscribe to queue ", zap.String("subject", prefixedSubjectQueue))
-			return err
-		}
-
-		subscriptions = append(subscriptions, subscription)
-
-		m.Logger.Infow("subscribed to NATS subject ", zap.String("subject", subject))
-	}
-
+	// wait for nats messages on subject(s)
 	for {
 		select {
 		case <-m.Context.Done():
 			return nil
-		case msg := <-msgBus:
+		case msg := <-m.NatsClient.MsgBus:
 			if err := m.processMsg(msg); err != nil {
 				return err
 			} else {
 				if err := msg.Ack(); err != nil {
-					m.Logger.Errorw("failed to ack received msg", zap.Error(err))
+					m.Logger.Errorw("failed to ack processed msg", zap.Error(err))
 					return err
 				}
 			}
