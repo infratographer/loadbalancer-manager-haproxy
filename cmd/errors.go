@@ -17,4 +17,10 @@ var (
 
 	// ErrLBAPIURLRequired is returned when the LB API url is missing
 	ErrLBAPIURLRequired = errors.New("loadbalancer api url is required and cannot be empty")
+
+	// ErrLBIDRequired is the loadbalancer id to watch for changes on the msg queue
+	ErrLBIDRequired = errors.New("loadbalancer gidx is required and cannot be empty")
+
+	// ErrLBIDInvalid is returned when the loadbalancer gidx is invalid
+	ErrLBIDInvalid = errors.New("loadbalancer gidx is invalid")
 )

@@ -11,6 +11,7 @@ import (
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/manager"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/pubsub"
 	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
+	"go.infratographer.com/x/gidx"
 	"go.uber.org/zap"
 
 	"github.com/spf13/cobra"
@@ -55,6 +56,9 @@ func init() {
 
 	runCmd.PersistentFlags().String("loadbalancerapi-url", "", "LoadbalancerAPI url")
 	viperBindFlag("loadbalancerapi.url", runCmd.PersistentFlags().Lookup("loadbalancerapi-url"))
+
+	runCmd.PersistentFlags().String("loadbalancer-id", "", "Loadbalancer ID to act on event changes")
+	viperBindFlag("loadbalancer.id", runCmd.PersistentFlags().Lookup("loadbalancer-id"))
 }
 
 func run(cmdCtx context.Context, v *viper.Viper) error {
@@ -72,17 +76,25 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 		cancel()
 	}()
 
+	mgr := &manager.Manager{
+		Context:     ctx,
+		Logger:      logger,
+		ManagedLBID: viper.GetString("loadbalancer.id"),
+		BaseCfgPath: viper.GetString("haproxy.config.base"),
+	}
+
 	// init other components
-	dpc := dataplaneapi.NewClient(viper.GetString("dataplane.url"))
-	lbc := lbapi.NewClient(viper.GetString("loadbalancerapi.url"))
+	mgr.DataPlaneClient = dataplaneapi.NewClient(viper.GetString("dataplane.url"))
+	mgr.LBClient = lbapi.NewClient(viper.GetString("loadbalancerapi.url"))
 
 	// setup, connect to nats and subscribe to subjects
-	natsClient := pubsub.NewNatsClient(ctx, viper.GetString("nats.url"),
+	mgr.NatsClient = pubsub.NewNatsClient(ctx, viper.GetString("nats.url"),
 		pubsub.WithUserCredentials(viper.GetString("nats.creds")),
 		pubsub.WithLogger(logger),
+		pubsub.WithMsgHandler(mgr.ProcessMsg),
 	)
 
-	if err := natsClient.Connect(); err != nil {
+	if err := mgr.NatsClient.Connect(); err != nil {
 		logger.Error("failed to connect to nats server", zap.Error(err))
 		return err
 	}
@@ -92,19 +104,10 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 
 	for _, subject := range subjects {
 		prefixedSubjectQueue := fmt.Sprintf("%s.%s", prefix, subject)
-		if err := natsClient.Subscribe(prefixedSubjectQueue); err != nil {
+		if err := mgr.NatsClient.Subscribe(prefixedSubjectQueue); err != nil {
 			logger.Errorw("failed to subscribe to queue ", zap.String("subject", prefixedSubjectQueue))
 			return err
 		}
-	}
-
-	mgr := &manager.Manager{
-		Context:         ctx,
-		Logger:          logger,
-		NatsClient:      natsClient,
-		DataPlaneClient: dpc,
-		LBClient:        lbc,
-		BaseCfgPath:     viper.GetString("haproxy.config.base"),
 	}
 
 	defer func() {
@@ -142,6 +145,16 @@ func validateMandatoryFlags() error {
 
 	if viper.GetString("loadbalancerapi.url") == "" {
 		errs = append(errs, ErrLBAPIURLRequired.Error())
+	}
+
+	if viper.GetString("loadbalancer.id") == "" {
+		errs = append(errs, ErrLBIDRequired.Error())
+	}
+
+	// check if the loadbalancer id is a valid gidx
+	_, err := gidx.Parse(viper.GetString("loadbalancer.id"))
+	if err != nil {
+		errs = append(errs, ErrLBIDInvalid.Error())
 	}
 
 	if len(errs) == 0 {

@@ -6,8 +6,10 @@ import (
 )
 
 var (
-	// errInvalidLBID is returned when an invalid load balancer ID is provided
-	errInvalidLBID = errors.New("optional lbID param must be not set or set to a singular loadbalancer ID")
+	// errLoadBalancerIDInvalid is returned when an invalid load balancer ID is provided
+	errLoadBalancerIDInvalid = errors.New("optional loadbalancer ID param must be not set or set to a singular loadbalancer ID")
+
+	errLoadbalancerIDNotFound = errors.New("loadbalancer ID not found in message")
 
 	// errFrontendSectionLabelFailure is returned when a frontend section cannot be created
 	errFrontendSectionLabelFailure = errors.New("failed to create frontend section with label")

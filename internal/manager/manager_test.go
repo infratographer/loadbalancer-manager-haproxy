@@ -2,6 +2,7 @@ package manager
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -9,10 +10,13 @@ import (
 
 	parser "github.com/haproxytech/config-parser/v4"
 	"github.com/haproxytech/config-parser/v4/options"
+	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/manager/mock"
 	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
+	"go.infratographer.com/x/gidx"
+	"go.infratographer.com/x/pubsubx"
 	"go.uber.org/zap"
 )
 
@@ -220,6 +224,117 @@ func TestUpdateConfigToLatest(t *testing.T) {
 
 		assert.Equal(t, strings.TrimSpace(string(expCfg)), strings.TrimSpace(mgr.currentConfig))
 	})
+}
+
+func TestGetTargetLoadBalancerID(t *testing.T) {
+	testcases := []struct {
+		name          string
+		pubsubMsg     pubsubx.ChangeMessage
+		exptectedLBID gidx.PrefixedID
+		errMsg        string
+	}{
+		{
+			name:      "failure to parse invalid subjectID",
+			pubsubMsg: pubsubx.ChangeMessage{SubjectID: "loadbal-"},
+			errMsg:    "invalid id",
+		},
+		{
+			name: "failure when loadbalancer id not found in the msg",
+			pubsubMsg: pubsubx.ChangeMessage{SubjectID: "loadprt-test",
+				AdditionalSubjectIDs: []gidx.PrefixedID{"loadpol-test"}},
+			errMsg: "not found",
+		},
+		{
+			name:          "get target loadbalancer gixd from SubjectID",
+			exptectedLBID: "loadbal-test",
+			pubsubMsg: pubsubx.ChangeMessage{SubjectID: "loadbal-test",
+				AdditionalSubjectIDs: []gidx.PrefixedID{"loadpol-test"}},
+		},
+		{
+			name:          "get target loadbalancer gixd from AdditionalSubjectIDs",
+			exptectedLBID: "loadbal-test",
+			pubsubMsg: pubsubx.ChangeMessage{SubjectID: "loadprt-test",
+				AdditionalSubjectIDs: []gidx.PrefixedID{"loadbal-test"}},
+		},
+	}
+
+	for _, tt := range testcases {
+		// go vet
+		tt := tt
+
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			lbID, err := getTargetLoadBalancerID(&tt.pubsubMsg)
+
+			if tt.errMsg != "" {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tt.errMsg)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tt.exptectedLBID, lbID)
+		})
+	}
+}
+
+func TestProcessMsg(t *testing.T) {
+	l, err := zap.NewDevelopmentConfig().Build()
+	logger := l.Sugar()
+
+	require.Nil(t, err)
+
+	mgr := Manager{
+		Logger:      logger,
+		ManagedLBID: "loadbal-managedbythisprocess",
+	}
+
+	ProcessMsgTests := []struct {
+		name      string
+		pubsubMsg interface{}
+		errMsg    string
+	}{
+		{
+			name:      "failure to unmarshal msg",
+			pubsubMsg: "not a valid msg",
+			errMsg:    "cannot unmarshal",
+		},
+		{
+			name:      "ignores messages with subject prefix not supported",
+			pubsubMsg: pubsubx.ChangeMessage{SubjectID: "invalid-", EventType: eventTypeCreate},
+		},
+		{
+			name:      "ignores messages not targeted for this lb",
+			pubsubMsg: pubsubx.ChangeMessage{SubjectID: "loadbal-test", EventType: eventTypeCreate},
+		},
+	}
+
+	for _, tt := range ProcessMsgTests {
+		// go vet
+		tt := tt
+
+		data, _ := json.Marshal(tt.pubsubMsg)
+
+		natsMsg := &nats.Msg{
+			Subject: "test.subject",
+			Data:    data,
+		}
+
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := mgr.ProcessMsg(natsMsg)
+
+			if tt.errMsg != "" {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, tt.errMsg)
+				return
+			}
+
+			assert.NoError(t, err)
+		})
+	}
 }
 
 var mergeTestData1 = loadBalancer{
