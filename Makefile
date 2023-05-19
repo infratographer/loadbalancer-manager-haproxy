@@ -4,9 +4,9 @@ GOOS=linux
 # use the working dir as the app name, this should be the repo name
 APP_NAME=$(shell basename $(CURDIR))
 
-test: | unit-test
+test: | lint unit-test
 
-unit-test: | lint
+unit-test:
 	@echo Running unit tests...
 	@go test -cover -short -tags testtools ./...
 
@@ -26,7 +26,7 @@ build:
 	@go mod download
 	@CGO_ENABLED=0 GOOS=linux go build -mod=readonly -v -o bin/${APP_NAME}
 
-clean: 
+clean:
 	@echo Cleaning...
 	@rm -f bin/${APP_NAME}
 	@rm -rf ./dist/
