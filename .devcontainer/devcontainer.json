@@ -1,30 +1,44 @@
 // Config reference, https://containers.dev/implementors/json_reference/
 {
-    "name": "loadbalancer-manager-haproxy",
-    "dockerComposeFile":"docker-compose.yaml",
-    "service": "dev",
-    "runServices": ["dev", "haproxy", "nats-auth", "nats-server"],
-    "workspaceFolder": "/loadbalancer-manager-haproxy",
-    "customizations": {
-            // Configure properties specific to VS Code.
-            "vscode": {
-                    // Set *default* container specific settings.json values on container create.
-                    "settings": {
-                            "go.toolsManagement.checkForUpdates": "local",
-                            "go.useLanguageServer": true,
-                            "go.gopath": "/go"
-                    },
-
-                    // Add the IDs of extensions you want installed when the container is created.
-                    "extensions": [
-                            "golang.Go",
-                            "ms-azuretools.vscode-docker"
-                    ]
-            }
-    },
-    "remoteUser": "vscode",
-    "features": {
-            "git": "latest"
-    }
-
+        "name": "loadbalancer-manager-haproxy",
+        "dockerComposeFile": "docker-compose.yaml",
+        "service": "dev",
+        "shutdownAction": "stopCompose",
+        "runServices": [
+                "dev",
+                "haproxy",
+                "nats-auth",
+                "nats-server"
+        ],
+        "workspaceFolder": "/loadbalancer-manager-haproxy",
+        "customizations": {
+                // Configure properties specific to VS Code.
+                "vscode": {
+                        // Set *default* container specific settings.json values on container create.
+                        "settings": {
+                                "[go]": {
+                                        "editor.defaultFormatter": "golang.go"
+                                },
+                                "go.toolsManagement.checkForUpdates": "local",
+                                "go.useLanguageServer": true,
+                                "go.formatTool": "goimports",
+                                "go.lintTool": "golangci-lint",
+                                "gopls": {
+                                        "formatting.gofumpt": true,
+                                        "formatting.local": "go.infratographer.com/loadbalancer-manager-haproxy"
+                                }
+                        },
+                        // Add the IDs of extensions you want installed when the container is created.
+                        "extensions": [
+                                "golang.Go",
+                                "ms-azuretools.vscode-docker"
+                        ]
+                }
+        },
+        // Use 'forwardPorts' to make a list of ports inside the container available locally.
+        // "forwardPorts": [],
+        "remoteUser": "vscode",
+        "features": {
+                "git": "latest"
+        }
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/haproxytech/config-parser/v4/options"
 	"github.com/haproxytech/config-parser/v4/types"
 	"github.com/nats-io/nats.go"
+
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/dataplaneapi"
 	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
 
@@ -279,7 +280,8 @@ func mergeConfig(cfg parser.Parser, lb *loadBalancer) (parser.Parser, error) {
 		}
 
 		if err := cfg.Insert(parser.Frontends, p.Name, "bind", types.Bind{
-			Path: fmt.Sprintf("%s@:%d", p.AddressFamily, p.Port)}); err != nil {
+			Path: fmt.Sprintf("%s@:%d", p.AddressFamily, p.Port),
+		}); err != nil {
 			return nil, newAttrError(errFrontendBindFailure, err)
 		}
 
