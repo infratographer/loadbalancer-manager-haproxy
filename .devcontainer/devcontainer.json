@@ -24,7 +24,6 @@
                                 "go.formatTool": "goimports",
                                 "go.lintTool": "golangci-lint",
                                 "gopls": {
-                                        "formatting.gofumpt": true,
                                         "formatting.local": "go.infratographer.com/loadbalancer-manager-haproxy"
                                 }
                         },
@@ -38,7 +37,5 @@
         // Use 'forwardPorts' to make a list of ports inside the container available locally.
         // "forwardPorts": [],
         "remoteUser": "vscode",
-        "features": {
-                "git": "latest"
-        }
+        "features": {}
 }

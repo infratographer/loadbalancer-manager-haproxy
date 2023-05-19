@@ -1,4 +1,4 @@
-ARG GO_VERSION=1.19
+ARG GO_VERSION=1.20
 
 FROM nats:latest as nats
 
@@ -8,3 +8,4 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive && \
     apt-get -y install --no-install-recommends bash-completion vim
 
 RUN go install github.com/nats-io/natscli/nats@latest
+RUN chown vscode -R /go/pkg
