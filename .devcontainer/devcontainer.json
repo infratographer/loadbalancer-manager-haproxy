@@ -10,7 +10,7 @@
                 "nats-auth",
                 "nats-server"
         ],
-        "workspaceFolder": "/loadbalancer-manager-haproxy",
+        "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
         "customizations": {
                 // Configure properties specific to VS Code.
                 "vscode": {
