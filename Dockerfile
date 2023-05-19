@@ -1,4 +1,4 @@
-FROM golang:1.19 as builder
+FROM golang:1.20 as builder
 
 # Create and change to the app directory.
 WORKDIR /app
@@ -13,7 +13,7 @@ COPY . ./
 
 # Build the binary.
 # -mod=readonly ensures immutable go.mod and go.sum in container builds.
-RUN CGO_ENABLED=0 GOOS=linux go build -mod=readonly -v -o loadbalancer-manager-haproxy 
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=readonly -v -o loadbalancer-manager-haproxy
 
 FROM gcr.io/distroless/static
 
