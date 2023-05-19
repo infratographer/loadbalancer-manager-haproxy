@@ -11,7 +11,6 @@ import (
 	"github.com/haproxytech/config-parser/v4/types"
 	"github.com/nats-io/nats.go"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/dataplaneapi"
-	"go.infratographer.com/loadbalancer-manager-haproxy/internal/pubsub"
 	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
 
 	"go.infratographer.com/x/gidx"
@@ -34,11 +33,19 @@ type dataPlaneAPI interface {
 	APIIsReady(ctx context.Context) bool
 }
 
+type natsClient interface {
+	Connect() error
+	Listen() error
+	Ack(msg *nats.Msg) error
+	Subscribe(subject string) error
+	Close() error
+}
+
 // Manager contains configuration and client connections
 type Manager struct {
 	Context         context.Context
 	Logger          *zap.SugaredLogger
-	NatsClient      *pubsub.NatsClient
+	NatsClient      natsClient
 	DataPlaneClient dataPlaneAPI
 	LBClient        lbAPI
 	ManagedLBID     string
@@ -161,7 +168,7 @@ func (m Manager) ProcessMsg(msg *nats.Msg) error {
 			}
 		}
 
-		if err := msg.Ack(); err != nil {
+		if err := m.NatsClient.Ack(msg); err != nil {
 			m.Logger.Errorw("failed to ack msg", zap.Error(err), zap.String("subjectID", pubsubMsg.SubjectID.String()))
 			return err
 		}

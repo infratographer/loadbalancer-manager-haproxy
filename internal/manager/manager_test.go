@@ -335,6 +335,54 @@ func TestProcessMsg(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+
+	t.Run("successfully process create msg", func(t *testing.T) {
+		t.Parallel()
+
+		mockDataplaneAPI := &mock.DataplaneAPIClient{
+			DoPostConfig: func(ctx context.Context, config string) error {
+				return nil
+			},
+		}
+
+		mockNatsClient := &mock.NatsClient{
+			DoAck: func(msg *nats.Msg) error {
+				return nil
+			},
+		}
+
+		mockLBAPI := &mock.LBAPIClient{
+			DoGetLoadBalancer: func(ctx context.Context, id string) (*lbapi.LoadBalancerResponse, error) {
+				return &lbapi.LoadBalancerResponse{
+					LoadBalancer: lbapi.LoadBalancer{
+						ID:    "loadbal-managedbythisprocess",
+						Ports: []lbapi.Port{},
+					},
+				}, nil
+			},
+		}
+
+		mgr := Manager{
+			Logger:          logger,
+			DataPlaneClient: mockDataplaneAPI,
+			NatsClient:      mockNatsClient,
+			LBClient:        mockLBAPI,
+			ManagedLBID:     "loadbal-managedbythisprocess",
+		}
+
+		data, _ := json.Marshal(pubsubx.ChangeMessage{
+			SubjectID: "loadbal-managedbythisprocess",
+			EventType: eventTypeCreate,
+		})
+
+		natsMsg := &nats.Msg{
+			Subject: "test.subject",
+			Data:    data,
+		}
+
+		err := mgr.ProcessMsg(natsMsg)
+		require.Nil(t, err)
+	})
 }
 
 var mergeTestData1 = loadBalancer{

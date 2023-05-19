@@ -90,6 +90,11 @@ func (c *NatsClient) Subscribe(subject string) error {
 	return nil
 }
 
+// Ack acknowledges a nats message
+func (c *NatsClient) Ack(msg *nats.Msg) error {
+	return msg.Ack()
+}
+
 // Listen start listening for messages on registered subjects and calls the registered message handler
 func (c *NatsClient) Listen() error {
 	if c.conn == nil || c.conn.IsClosed() {
