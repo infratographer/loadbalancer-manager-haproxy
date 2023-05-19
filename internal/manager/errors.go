@@ -6,9 +6,10 @@ import (
 )
 
 var (
-	// errLoadBalancerIDInvalid is returned when an invalid load balancer ID is provided
-	errLoadBalancerIDInvalid = errors.New("optional loadbalancer ID param must be not set or set to a singular loadbalancer ID")
+	// errLoadBalancerIDParamInvalid is returned when an invalid load balancer ID is provided
+	errLoadBalancerIDParamInvalid = errors.New("optional loadbalancer ID param must be not set or set to a singular loadbalancer ID")
 
+	// errLoadbalancerIDNotFound is returned when a loadbalancer ID cannot be found in a nats message
 	errLoadbalancerIDNotFound = errors.New("loadbalancer ID not found in message")
 
 	// errFrontendSectionLabelFailure is returned when a frontend section cannot be created

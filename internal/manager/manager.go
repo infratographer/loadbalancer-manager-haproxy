@@ -148,12 +148,17 @@ func (m Manager) ProcessMsg(msg *nats.Msg) error {
 			return nil
 		}
 
-		if err := m.updateConfigToLatest(targetLoadBalancerID.String()); err != nil {
-			m.Logger.Errorw("failed to update haproxy config",
-				zap.String("loadbalancer.id", targetLoadBalancerID.String()),
-				zap.Error(err))
+		// todo - @rizzza - requires lbapi graph client
+		m.Logger.Warn("lbapi graph client is not implemented yet to update haproxy config")
 
-			return err
+		if false {
+			if err := m.updateConfigToLatest(targetLoadBalancerID.String()); err != nil {
+				m.Logger.Errorw("failed to update haproxy config",
+					zap.String("loadbalancer.id", targetLoadBalancerID.String()),
+					zap.Error(err))
+
+				return err
+			}
 		}
 
 		if err := msg.Ack(); err != nil {
@@ -170,7 +175,7 @@ func (m Manager) ProcessMsg(msg *nats.Msg) error {
 // updateConfigToLatest update the haproxy cfg to either baseline or one requested from lbapi with optional lbID param
 func (m *Manager) updateConfigToLatest(lbID ...string) error {
 	if len(lbID) > 1 {
-		return errLoadBalancerIDInvalid
+		return errLoadBalancerIDParamInvalid
 	}
 
 	m.Logger.Info("updating the config")
@@ -182,59 +187,55 @@ func (m *Manager) updateConfigToLatest(lbID ...string) error {
 	}
 
 	if len(lbID) == 1 {
-		m.Logger.Warn("graph client not implemented yet to update haproxy cfg")
-		return nil
+		// get desired state from lbapi
+		lbResp, err := m.LBClient.GetLoadBalancer(m.Context, m.ManagedLBID)
+		if err != nil {
+			return err
+		}
 
-		// requested a lb id, query lbapi
-		// get desired state
-		// lbResp, err := m.LBClient.GetLoadBalancer(m.Context, lbID[0])
-		// if err != nil {
-		// 	return err
-		// }
+		lb := loadBalancer{
+			ID: lbResp.LoadBalancer.ID,
+		}
 
-		// lb := loadBalancer{
-		// 	ID: lbResp.LoadBalancer.ID,
-		// }
+		// translate responses, populate data structure
+		for i, p := range lbResp.LoadBalancer.Ports {
+			lb.Ports = append(lb.Ports, port{
+				AddressFamily: p.AddressFamily,
+				ID:            p.ID,
+				Name:          p.Name,
+				Port:          p.Port,
+			})
 
-		// // translate responses, populate data structure
-		// for i, p := range lbResp.LoadBalancer.Ports {
-		// 	lb.Ports = append(lb.Ports, port{
-		// 		AddressFamily: p.AddressFamily,
-		// 		ID:            p.ID,
-		// 		Name:          p.Name,
-		// 		Port:          p.Port,
-		// 	})
+			for _, poolID := range p.Pools {
+				poolResp, err := m.LBClient.GetPool(m.Context, poolID)
+				if err != nil {
+					return err
+				}
 
-		// 	for _, poolID := range p.Pools {
-		// 		poolResp, err := m.LBClient.GetPool(m.Context, poolID)
-		// 		if err != nil {
-		// 			return err
-		// 		}
+				data := pool{
+					ID:   poolID,
+					Name: poolResp.Pool.Name,
+				}
 
-		// 		data := pool{
-		// 			ID:   poolID,
-		// 			Name: poolResp.Pool.Name,
-		// 		}
+				for _, o := range poolResp.Pool.Origins {
+					data.Origins = append(data.Origins, origin{
+						ID:        o.ID,
+						Name:      o.Name,
+						IPAddress: o.IPAddress,
+						Disabled:  o.Disabled,
+						Port:      o.Port,
+					})
+				}
 
-		// 		for _, o := range poolResp.Pool.Origins {
-		// 			data.Origins = append(data.Origins, origin{
-		// 				ID:        o.ID,
-		// 				Name:      o.Name,
-		// 				IPAddress: o.IPAddress,
-		// 				Disabled:  o.Disabled,
-		// 				Port:      o.Port,
-		// 			})
-		// 		}
+				lb.Ports[i].Pools = append(lb.Ports[i].Pools, data)
+			}
+		}
 
-		// 		lb.Ports[i].Pools = append(lb.Ports[i].Pools, data)
-		// 	}
-		// }
-
-		// // merge response
-		// cfg, err = mergeConfig(cfg, &lb)
-		// if err != nil {
-		// 	return err
-		// }
+		// merge response
+		cfg, err = mergeConfig(cfg, &lb)
+		if err != nil {
+			return err
+		}
 	}
 
 	// post dataplaneapi
