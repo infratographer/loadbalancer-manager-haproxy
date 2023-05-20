@@ -25,8 +25,7 @@ var (
 )
 
 type lbAPI interface {
-	GetLoadBalancer(ctx context.Context, id string) (*lbapi.LoadBalancerResponse, error)
-	GetPool(ctx context.Context, id string) (*lbapi.PoolResponse, error)
+	GetLoadBalancer(ctx context.Context, id string) (*lbapi.GetLoadBalancer, error)
 }
 
 type dataPlaneAPI interface {
@@ -196,51 +195,13 @@ func (m *Manager) updateConfigToLatest(lbID ...string) error {
 
 	if len(lbID) == 1 {
 		// get desired state from lbapi
-		lbResp, err := m.LBClient.GetLoadBalancer(m.Context, m.ManagedLBID)
+		lb, err := m.LBClient.GetLoadBalancer(m.Context, m.ManagedLBID)
 		if err != nil {
 			return err
 		}
 
-		lb := loadBalancer{
-			ID: lbResp.LoadBalancer.ID,
-		}
-
-		// translate responses, populate data structure
-		for i, p := range lbResp.LoadBalancer.Ports {
-			lb.Ports = append(lb.Ports, port{
-				AddressFamily: p.AddressFamily,
-				ID:            p.ID,
-				Name:          p.Name,
-				Port:          p.Port,
-			})
-
-			for _, poolID := range p.Pools {
-				poolResp, err := m.LBClient.GetPool(m.Context, poolID)
-				if err != nil {
-					return err
-				}
-
-				data := pool{
-					ID:   poolID,
-					Name: poolResp.Pool.Name,
-				}
-
-				for _, o := range poolResp.Pool.Origins {
-					data.Origins = append(data.Origins, origin{
-						ID:        o.ID,
-						Name:      o.Name,
-						IPAddress: o.IPAddress,
-						Disabled:  o.Disabled,
-						Port:      o.Port,
-					})
-				}
-
-				lb.Ports[i].Pools = append(lb.Ports[i].Pools, data)
-			}
-		}
-
 		// merge response
-		cfg, err = mergeConfig(cfg, &lb)
+		cfg, err = mergeConfig(cfg, *lb)
 		if err != nil {
 			return err
 		}
@@ -272,44 +233,44 @@ func (m Manager) waitForDataPlaneReady(retries int, sleep time.Duration) error {
 }
 
 // mergeConfig takes the response from lb api, merges with the base haproxy config and returns it
-func mergeConfig(cfg parser.Parser, lb *loadBalancer) (parser.Parser, error) {
-	for _, p := range lb.Ports {
+func mergeConfig(cfg parser.Parser, lb lbapi.GetLoadBalancer) (parser.Parser, error) {
+	for _, p := range lb.LoadBalancer.Ports.Edges {
 		// create port
-		if err := cfg.SectionsCreate(parser.Frontends, p.Name); err != nil {
-			return nil, newLabelError(p.Name, errFrontendSectionLabelFailure, err)
+		if err := cfg.SectionsCreate(parser.Frontends, p.Node.Name); err != nil {
+			return nil, newLabelError(p.Node.Name, errFrontendSectionLabelFailure, err)
 		}
 
-		if err := cfg.Insert(parser.Frontends, p.Name, "bind", types.Bind{
-			Path: fmt.Sprintf("%s@:%d", p.AddressFamily, p.Port),
-		}); err != nil {
+		if err := cfg.Insert(parser.Frontends, p.Node.Name, "bind", types.Bind{
+			// TODO AddressFamily
+			Path: fmt.Sprintf("%s@:%d", "ipv4", p.Node.Number)}); err != nil {
 			return nil, newAttrError(errFrontendBindFailure, err)
 		}
 
 		// map frontend to backend
-		if err := cfg.Set(parser.Frontends, p.Name, "use_backend", types.UseBackend{Name: p.Name}); err != nil {
+		if err := cfg.Set(parser.Frontends, p.Node.Name, "use_backend", types.UseBackend{Name: p.Node.Name}); err != nil {
 			return nil, newAttrError(errUseBackendFailure, err)
 		}
 
 		// create backend
-		if err := cfg.SectionsCreate(parser.Backends, p.Name); err != nil {
-			return nil, newLabelError(p.Name, errBackendSectionLabelFailure, err)
+		if err := cfg.SectionsCreate(parser.Backends, p.Node.Name); err != nil {
+			return nil, newLabelError(p.Node.Name, errBackendSectionLabelFailure, err)
 		}
 
-		for _, pool := range p.Pools {
-			for _, origin := range pool.Origins {
+		for _, pool := range p.Node.Pools {
+			for _, origin := range pool.Origins.Edges {
 				srvAddr := fmt.Sprintf("%s:%d check port %d", origin.IPAddress, origin.Port, origin.Port)
 
-				if origin.Disabled {
+				if !origin.Node.Active {
 					srvAddr += " disabled"
 				}
 
 				srvr := types.Server{
-					Name:    origin.ID,
+					Name:    origin.Node.Name,
 					Address: srvAddr,
 				}
 
-				if err := cfg.Set(parser.Backends, p.Name, "server", srvr); err != nil {
-					return nil, newLabelError(p.Name, errBackendServerFailure, err)
+				if err := cfg.Set(parser.Backends, p.Node.Name, "server", srvr); err != nil {
+					return nil, newLabelError(p.Node.Name, errBackendServerFailure, err)
 				}
 			}
 		}
