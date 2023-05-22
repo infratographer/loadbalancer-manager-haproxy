@@ -5,7 +5,7 @@ services:
       dockerfile: Dockerfile
     command: sleep infinity
     volumes:
-      - ..:/loadbalancer-manager-haproxy:cached
+      - ..:/workspaces:cached
       - nats-auth:/etc/nats-auth
   haproxy:
     build:
