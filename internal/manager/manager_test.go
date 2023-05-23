@@ -471,7 +471,7 @@ var mergeTestData2 = lbapi.GetLoadBalancer{
 									Edges: []lbapi.OriginEdges{
 										{
 											Node: lbapi.OriginNode{
-												ID:         "loadogn-testb1",
+												ID:         "loadogn-test4",
 												Name:       "svr1-2222",
 												Target:     "7.8.9.0",
 												PortNumber: 2222,

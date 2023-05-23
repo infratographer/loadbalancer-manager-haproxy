@@ -236,24 +236,24 @@ func (m Manager) waitForDataPlaneReady(retries int, sleep time.Duration) error {
 func mergeConfig(cfg parser.Parser, lb *lbapi.GetLoadBalancer) (parser.Parser, error) {
 	for _, p := range lb.LoadBalancer.Ports.Edges {
 		// create port
-		if err := cfg.SectionsCreate(parser.Frontends, p.Node.Name); err != nil {
-			return nil, newLabelError(p.Node.Name, errFrontendSectionLabelFailure, err)
+		if err := cfg.SectionsCreate(parser.Frontends, p.Node.ID); err != nil {
+			return nil, newLabelError(p.Node.ID, errFrontendSectionLabelFailure, err)
 		}
 
-		if err := cfg.Insert(parser.Frontends, p.Node.Name, "bind", types.Bind{
+		if err := cfg.Insert(parser.Frontends, p.Node.ID, "bind", types.Bind{
 			// TODO AddressFamily
 			Path: fmt.Sprintf("%s@:%d", "ipv4", p.Node.Number)}); err != nil {
 			return nil, newAttrError(errFrontendBindFailure, err)
 		}
 
 		// map frontend to backend
-		if err := cfg.Set(parser.Frontends, p.Node.Name, "use_backend", types.UseBackend{Name: p.Node.Name}); err != nil {
+		if err := cfg.Set(parser.Frontends, p.Node.ID, "use_backend", types.UseBackend{Name: p.Node.ID}); err != nil {
 			return nil, newAttrError(errUseBackendFailure, err)
 		}
 
 		// create backend
-		if err := cfg.SectionsCreate(parser.Backends, p.Node.Name); err != nil {
-			return nil, newLabelError(p.Node.Name, errBackendSectionLabelFailure, err)
+		if err := cfg.SectionsCreate(parser.Backends, p.Node.ID); err != nil {
+			return nil, newLabelError(p.Node.ID, errBackendSectionLabelFailure, err)
 		}
 
 		for _, pool := range p.Node.Pools {
@@ -265,12 +265,12 @@ func mergeConfig(cfg parser.Parser, lb *lbapi.GetLoadBalancer) (parser.Parser, e
 				}
 
 				srvr := types.Server{
-					Name:    origin.Node.Name,
+					Name:    origin.Node.ID,
 					Address: srvAddr,
 				}
 
-				if err := cfg.Set(parser.Backends, p.Node.Name, "server", srvr); err != nil {
-					return nil, newLabelError(p.Node.Name, errBackendServerFailure, err)
+				if err := cfg.Set(parser.Backends, p.Node.ID, "server", srvr); err != nil {
+					return nil, newLabelError(p.Node.ID, errBackendServerFailure, err)
 				}
 			}
 		}
