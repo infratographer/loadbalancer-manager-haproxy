@@ -201,7 +201,7 @@ func (m *Manager) updateConfigToLatest(lbID ...string) error {
 		}
 
 		// merge response
-		cfg, err = mergeConfig(cfg, *lb)
+		cfg, err = mergeConfig(cfg, lb)
 		if err != nil {
 			return err
 		}
@@ -233,7 +233,7 @@ func (m Manager) waitForDataPlaneReady(retries int, sleep time.Duration) error {
 }
 
 // mergeConfig takes the response from lb api, merges with the base haproxy config and returns it
-func mergeConfig(cfg parser.Parser, lb lbapi.GetLoadBalancer) (parser.Parser, error) {
+func mergeConfig(cfg parser.Parser, lb *lbapi.GetLoadBalancer) (parser.Parser, error) {
 	for _, p := range lb.LoadBalancer.Ports.Edges {
 		// create port
 		if err := cfg.SectionsCreate(parser.Frontends, p.Node.Name); err != nil {
