@@ -43,6 +43,37 @@ func (c *Client) APIIsReady(ctx context.Context) bool {
 	return resp.StatusCode == http.StatusOK
 }
 
+// CheckConfig validates the proposed config without applying it
+func (c Client) CheckConfig(ctx context.Context, config string) error {
+	url := c.baseURL + "/services/haproxy/configuration/raw?only_validate=true"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBufferString(config))
+	if err != nil {
+		return err
+	}
+
+	req.SetBasicAuth(viper.GetString("dataplane.user.name"), viper.GetString("dataplane.user.pwd"))
+	req.Header.Add("Content-Type", "text/plain")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusAccepted:
+		return nil
+	case http.StatusUnauthorized:
+		return ErrDataPlaneHTTPUnauthorized
+	case http.StatusBadRequest:
+		return ErrDataPlaneConfigInvalid
+	default:
+		return ErrDataPlaneHTTPError
+	}
+}
+
 // PostConfig pushes a new haproxy config in plain text using basic auth
 func (c *Client) PostConfig(ctx context.Context, config string) error {
 	url := c.baseURL + "/services/haproxy/configuration/raw?skip_version=true"

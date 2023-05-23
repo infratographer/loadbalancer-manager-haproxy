@@ -3,6 +3,7 @@ package manager
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -82,8 +83,31 @@ func TestUpdateConfigToLatest(t *testing.T) {
 			BaseCfgPath: testBaseCfgPath,
 		}
 
-		err := mgr.updateConfigToLatest("58622a8d-54a2-4b0c-8b5f-8de7dff29f6f")
+		err := mgr.updateConfigToLatest("loadbal-test")
 		assert.NotNil(t, err)
+	})
+
+	t.Run("fails to update invalid config", func(t *testing.T) {
+		t.Parallel()
+
+		mockDataplaneAPI := &mock.DataplaneAPIClient{
+			DoPostConfig: func(ctx context.Context, config string) error {
+				return nil
+			},
+			DoCheckConfig: func(ctx context.Context, config string) error {
+				return errors.New("bad config") // nolint:goerr113
+			},
+		}
+
+		mgr := Manager{
+			Logger:          logger,
+			DataPlaneClient: mockDataplaneAPI,
+			BaseCfgPath:     testBaseCfgPath,
+		}
+
+		// initial config
+		err := mgr.updateConfigToLatest()
+		require.Error(t, err)
 	})
 
 	t.Run("successfully sets initial base config", func(t *testing.T) {
@@ -91,6 +115,9 @@ func TestUpdateConfigToLatest(t *testing.T) {
 
 		mockDataplaneAPI := &mock.DataplaneAPIClient{
 			DoPostConfig: func(ctx context.Context, config string) error {
+				return nil
+			},
+			DoCheckConfig: func(ctx context.Context, config string) error {
 				return nil
 			},
 		}
@@ -178,6 +205,9 @@ func TestUpdateConfigToLatest(t *testing.T) {
 
 		mockDataplaneAPI := &mock.DataplaneAPIClient{
 			DoPostConfig: func(ctx context.Context, config string) error {
+				return nil
+			},
+			DoCheckConfig: func(ctx context.Context, config string) error {
 				return nil
 			},
 		}

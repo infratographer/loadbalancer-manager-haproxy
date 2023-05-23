@@ -30,6 +30,7 @@ type lbAPI interface {
 
 type dataPlaneAPI interface {
 	PostConfig(ctx context.Context, config string) error
+	CheckConfig(ctx context.Context, config string) error
 	APIIsReady(ctx context.Context) bool
 }
 
@@ -205,6 +206,11 @@ func (m *Manager) updateConfigToLatest(lbID ...string) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	// check dataplaneapi to see if a valid config
+	if err = m.DataPlaneClient.CheckConfig(m.Context, cfg.String()); err != nil {
+		return err
 	}
 
 	// post dataplaneapi

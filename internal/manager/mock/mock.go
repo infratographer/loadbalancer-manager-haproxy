@@ -19,8 +19,9 @@ func (c LBAPIClient) GetLoadBalancer(ctx context.Context, id string) (*lbapi.Get
 
 // DataplaneAPIClient mock client
 type DataplaneAPIClient struct {
-	DoPostConfig func(ctx context.Context, config string) error
-	DoAPIIsReady func(ctx context.Context) bool
+	DoPostConfig  func(ctx context.Context, config string) error
+	DoCheckConfig func(ctx context.Context, config string) error
+	DoAPIIsReady  func(ctx context.Context) bool
 }
 
 func (c *DataplaneAPIClient) PostConfig(ctx context.Context, config string) error {
@@ -29,6 +30,10 @@ func (c *DataplaneAPIClient) PostConfig(ctx context.Context, config string) erro
 
 func (c DataplaneAPIClient) APIIsReady(ctx context.Context) bool {
 	return c.DoAPIIsReady(ctx)
+}
+
+func (c DataplaneAPIClient) CheckConfig(ctx context.Context, config string) error {
+	return c.DoCheckConfig(ctx, config)
 }
 
 // NatsClient mock client
