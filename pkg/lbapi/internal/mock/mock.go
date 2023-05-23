@@ -1,14 +1,14 @@
 package mock
 
 import (
-	"net/http"
+	"context"
 )
 
-// HTTPClient is the mock http client
-type HTTPClient struct {
-	DoFunc func(req *http.Request) (*http.Response, error)
+// GQLClient is the mock http client
+type GQLClient struct {
+	DoQuery func(ctx context.Context, q interface{}, variables map[string]interface{}) error
 }
 
-func (c *HTTPClient) Do(req *http.Request) (*http.Response, error) {
-	return c.DoFunc(req)
+func (c *GQLClient) Query(ctx context.Context, q interface{}, variables map[string]interface{}) error {
+	return c.DoQuery(ctx, q, variables)
 }
