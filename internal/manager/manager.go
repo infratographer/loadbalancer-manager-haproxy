@@ -14,8 +14,8 @@ import (
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/dataplaneapi"
 	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
 
+	"go.infratographer.com/x/events"
 	"go.infratographer.com/x/gidx"
-	"go.infratographer.com/x/pubsubx"
 	"go.uber.org/zap"
 )
 
@@ -81,9 +81,6 @@ func (m *Manager) Run() error {
 const (
 	subjectPrefixLoadBalancer     = "loadbal"
 	subjectPrefixLoadBalancerPort = "loadprt"
-
-	eventTypeCreate = "create"
-	eventTypeUpdate = "update"
 )
 
 // supportedPrefix returns true if the subject prefix is supported by this manager
@@ -100,7 +97,7 @@ func supportedPrefix(prefix string) bool {
 
 // getTargetLoadBalancerID returns the loadbalancer id from the message,
 // whether it is the SubjectID, or one of the AdditionalSubjectIds
-func getTargetLoadBalancerID(msg *pubsubx.ChangeMessage) (gidx.PrefixedID, error) {
+func getTargetLoadBalancerID(msg *events.ChangeMessage) (gidx.PrefixedID, error) {
 	var lbID gidx.PrefixedID
 
 	if msg.SubjectID.Prefix() == subjectPrefixLoadBalancer {
@@ -128,7 +125,7 @@ func getTargetLoadBalancerID(msg *pubsubx.ChangeMessage) (gidx.PrefixedID, error
 
 // ProcessMsg message handler
 func (m Manager) ProcessMsg(msg *nats.Msg) error {
-	pubsubMsg := pubsubx.ChangeMessage{}
+	pubsubMsg := events.ChangeMessage{}
 	if err := json.Unmarshal(msg.Data, &pubsubMsg); err != nil {
 		m.Logger.Errorw("failed to process data in msg", zap.Error(err))
 		return err
@@ -140,10 +137,10 @@ func (m Manager) ProcessMsg(msg *nats.Msg) error {
 		return nil
 	}
 
-	switch pubsubMsg.EventType {
-	case eventTypeCreate:
+	switch events.ChangeType(pubsubMsg.EventType) {
+	case events.CreateChangeType:
 		fallthrough
-	case eventTypeUpdate:
+	case events.UpdateChangeType:
 		targetLoadBalancerID, err := getTargetLoadBalancerID(&pubsubMsg)
 		if err != nil {
 			m.Logger.Errorw("failed to get target loadbalancer id", zap.Error(err))

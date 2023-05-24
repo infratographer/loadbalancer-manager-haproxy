@@ -16,8 +16,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"go.infratographer.com/x/events"
 	"go.infratographer.com/x/gidx"
-	"go.infratographer.com/x/pubsubx"
 
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/manager/mock"
 	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
@@ -232,31 +232,31 @@ func TestUpdateConfigToLatest(t *testing.T) {
 func TestGetTargetLoadBalancerID(t *testing.T) {
 	testcases := []struct {
 		name          string
-		pubsubMsg     pubsubx.ChangeMessage
+		pubsubMsg     events.ChangeMessage
 		exptectedLBID gidx.PrefixedID
 		errMsg        string
 	}{
 		{
 			name:      "failure to parse invalid subjectID",
-			pubsubMsg: pubsubx.ChangeMessage{SubjectID: "loadbal-"},
+			pubsubMsg: events.ChangeMessage{SubjectID: "loadbal-"},
 			errMsg:    "invalid id",
 		},
 		{
 			name: "failure when loadbalancer id not found in the msg",
-			pubsubMsg: pubsubx.ChangeMessage{SubjectID: "loadprt-test",
+			pubsubMsg: events.ChangeMessage{SubjectID: "loadprt-test",
 				AdditionalSubjectIDs: []gidx.PrefixedID{"loadpol-test"}},
 			errMsg: "not found",
 		},
 		{
 			name:          "get target loadbalancer gixd from SubjectID",
 			exptectedLBID: "loadbal-test",
-			pubsubMsg: pubsubx.ChangeMessage{SubjectID: "loadbal-test",
+			pubsubMsg: events.ChangeMessage{SubjectID: "loadbal-test",
 				AdditionalSubjectIDs: []gidx.PrefixedID{"loadpol-test"}},
 		},
 		{
 			name:          "get target loadbalancer gixd from AdditionalSubjectIDs",
 			exptectedLBID: "loadbal-test",
-			pubsubMsg: pubsubx.ChangeMessage{SubjectID: "loadprt-test",
+			pubsubMsg: events.ChangeMessage{SubjectID: "loadprt-test",
 				AdditionalSubjectIDs: []gidx.PrefixedID{"loadbal-test"}},
 		},
 	}
@@ -305,11 +305,11 @@ func TestProcessMsg(t *testing.T) {
 		},
 		{
 			name:      "ignores messages with subject prefix not supported",
-			pubsubMsg: pubsubx.ChangeMessage{SubjectID: "invalid-", EventType: eventTypeCreate},
+			pubsubMsg: events.ChangeMessage{SubjectID: "invalid-", EventType: string(events.CreateChangeType)},
 		},
 		{
 			name:      "ignores messages not targeted for this lb",
-			pubsubMsg: pubsubx.ChangeMessage{SubjectID: "loadbal-test", EventType: eventTypeCreate},
+			pubsubMsg: events.ChangeMessage{SubjectID: "loadbal-test", EventType: string(events.CreateChangeType)},
 		},
 	}
 
@@ -372,9 +372,9 @@ func TestProcessMsg(t *testing.T) {
 			ManagedLBID:     "loadbal-managedbythisprocess",
 		}
 
-		data, _ := json.Marshal(pubsubx.ChangeMessage{
+		data, _ := json.Marshal(events.ChangeMessage{
 			SubjectID: "loadbal-managedbythisprocess",
-			EventType: eventTypeCreate,
+			EventType: string(events.CreateChangeType),
 		})
 
 		natsMsg := &nats.Msg{
