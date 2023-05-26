@@ -1,3 +1,14 @@
+# networks:
+#   load-balancer-mgr:
+#     name: load-balancer-mgr
+
+#   # Use external docker network to access the mock-oauth2-server, load-balancer-api
+#   # Fire up load-balancer-api dev containers first, then this manager
+#   # Verify connectivity: curl mock-oauth2-server:8081/default/.well-known/openid-configuration
+#   load-balancer:
+#     name: load-balancer
+#     external: true
+
 services:
   dev:
     image: devcontainer
@@ -15,7 +26,9 @@ services:
     #   - "127.0.0.1:2222:2222"
     # Use "forwardPorts" in **devcontainer.json** to forward a port locally.
     # (Adding the "ports" property to this file will not forward from a Codespace.)
-
+    # networks:
+    #   - load-balancer-mgr
+    #   - load-balancer
   haproxy:
     build:
       context: .
