@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/haproxytech/config-parser/v4 v4.1.0
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/nats-io/nats.go v1.25.0
+	github.com/nats-io/nats.go v1.26.0
 	github.com/shurcooL/graphql v0.0.0-20220606043923-3cf50f8a0a29
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/pflag v1.0.5
@@ -24,6 +24,7 @@ require (
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jaevor/go-nanoid v1.3.0 // indirect
+	github.com/klauspost/compress v1.16.5 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
 	github.com/nats-io/nats-server/v2 v2.9.17 // indirect
