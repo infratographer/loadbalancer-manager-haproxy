@@ -2,14 +2,12 @@ package manager
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	parser "github.com/haproxytech/config-parser/v4"
 	"github.com/haproxytech/config-parser/v4/options"
 	"github.com/haproxytech/config-parser/v4/types"
-	"github.com/nats-io/nats.go"
 
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/dataplaneapi"
 	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
@@ -17,6 +15,8 @@ import (
 	"go.infratographer.com/x/events"
 	"go.infratographer.com/x/gidx"
 	"go.uber.org/zap"
+
+	"github.com/ThreeDotsLabs/watermill/message"
 )
 
 var (
@@ -34,10 +34,10 @@ type dataPlaneAPI interface {
 	APIIsReady(ctx context.Context) bool
 }
 
-type natsClient interface {
-	Connect() error
+type eventSubscriber interface {
 	Listen() error
-	Ack(msg *nats.Msg) error
+	Ack(msg *message.Message) error
+	Nack(msg *message.Message) error
 	Subscribe(subject string) error
 	Close() error
 }
@@ -46,7 +46,7 @@ type natsClient interface {
 type Manager struct {
 	Context         context.Context
 	Logger          *zap.SugaredLogger
-	NatsClient      natsClient
+	Subscriber      eventSubscriber
 	DataPlaneClient dataPlaneAPI
 	LBClient        lbAPI
 	ManagedLBID     string
@@ -70,8 +70,8 @@ func (m *Manager) Run() error {
 		m.Logger.Errorw("failed to initialize the config", zap.Error(err))
 	}
 
-	// listen for nats messages on subject(s)
-	if err := m.NatsClient.Listen(); err != nil {
+	// listen for event messages on subject(s)
+	if err := m.Subscriber.Listen(); err != nil {
 		return err
 	}
 
@@ -124,24 +124,24 @@ func getTargetLoadBalancerID(msg *events.ChangeMessage) (gidx.PrefixedID, error)
 }
 
 // ProcessMsg message handler
-func (m Manager) ProcessMsg(msg *nats.Msg) error {
-	pubsubMsg := events.ChangeMessage{}
-	if err := json.Unmarshal(msg.Data, &pubsubMsg); err != nil {
+func (m Manager) ProcessMsg(msg *message.Message) error {
+	changeMsg, err := events.UnmarshalChangeMessage(msg.Payload)
+	if err != nil {
 		m.Logger.Errorw("failed to process data in msg", zap.Error(err))
 		return err
 	}
 
-	subjectPrefix := pubsubMsg.SubjectID.Prefix()
+	subjectPrefix := changeMsg.SubjectID.Prefix()
 	if !supportedPrefix(subjectPrefix) {
 		m.Logger.Debugw("ignoring msg, not a supported prefix", zap.String("subject-prefix", subjectPrefix))
 		return nil
 	}
 
-	switch events.ChangeType(pubsubMsg.EventType) {
+	switch events.ChangeType(changeMsg.EventType) {
 	case events.CreateChangeType:
 		fallthrough
 	case events.UpdateChangeType:
-		targetLoadBalancerID, err := getTargetLoadBalancerID(&pubsubMsg)
+		targetLoadBalancerID, err := getTargetLoadBalancerID(&changeMsg)
 		if err != nil {
 			m.Logger.Errorw("failed to get target loadbalancer id", zap.Error(err))
 			return err
@@ -166,12 +166,12 @@ func (m Manager) ProcessMsg(msg *nats.Msg) error {
 			}
 		}
 
-		if err := m.NatsClient.Ack(msg); err != nil {
-			m.Logger.Errorw("failed to ack msg", zap.Error(err), zap.String("subjectID", pubsubMsg.SubjectID.String()))
+		if err := m.Subscriber.Ack(msg); err != nil {
+			m.Logger.Errorw("failed to ack msg", zap.Error(err), zap.String("subjectID", changeMsg.SubjectID.String()))
 			return err
 		}
 	default:
-		m.Logger.Debugw("ignoring msg, not a create or update event", zap.String("event-type", pubsubMsg.EventType))
+		m.Logger.Debugw("ignoring msg, not a create or update event", zap.String("event-type", changeMsg.EventType))
 	}
 
 	return nil

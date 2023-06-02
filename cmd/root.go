@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// TODO: update app name
 const appName = "loadbalancer-manager-haproxy"
 
 var (

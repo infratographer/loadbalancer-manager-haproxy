@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ThreeDotsLabs/watermill/message"
 	parser "github.com/haproxytech/config-parser/v4"
 	"github.com/haproxytech/config-parser/v4/options"
-	"github.com/nats-io/nats.go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
@@ -319,15 +319,14 @@ func TestProcessMsg(t *testing.T) {
 
 		data, _ := json.Marshal(tt.pubsubMsg)
 
-		natsMsg := &nats.Msg{
-			Subject: "test.subject",
-			Data:    data,
+		eventMsg := &message.Message{
+			Payload: data,
 		}
 
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := mgr.ProcessMsg(natsMsg)
+			err := mgr.ProcessMsg(eventMsg)
 
 			if tt.errMsg != "" {
 				require.Error(t, err)
@@ -348,8 +347,8 @@ func TestProcessMsg(t *testing.T) {
 			},
 		}
 
-		mockNatsClient := &mock.NatsClient{
-			DoAck: func(msg *nats.Msg) error {
+		mockSubscriber := &mock.Subscriber{
+			DoAck: func(msg *message.Message) error {
 				return nil
 			},
 		}
@@ -367,7 +366,7 @@ func TestProcessMsg(t *testing.T) {
 		mgr := Manager{
 			Logger:          logger,
 			DataPlaneClient: mockDataplaneAPI,
-			NatsClient:      mockNatsClient,
+			Subscriber:      mockSubscriber,
 			LBClient:        mockLBAPI,
 			ManagedLBID:     "loadbal-managedbythisprocess",
 		}
@@ -377,12 +376,11 @@ func TestProcessMsg(t *testing.T) {
 			EventType: string(events.CreateChangeType),
 		})
 
-		natsMsg := &nats.Msg{
-			Subject: "test.subject",
-			Data:    data,
+		eventMsg := &message.Message{
+			Payload: data,
 		}
 
-		err := mgr.ProcessMsg(natsMsg)
+		err := mgr.ProcessMsg(eventMsg)
 		require.Nil(t, err)
 	})
 }

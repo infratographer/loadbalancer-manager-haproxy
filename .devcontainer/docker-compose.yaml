@@ -4,6 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
     command: sleep infinity
+    depends_on:
+      - nats
     volumes:
       - ..:/workspaces:cached
       - nats-auth:/etc/nats-auth
@@ -12,11 +14,13 @@ services:
     #   - "127.0.0.1:2222:2222"
     # Use "forwardPorts" in **devcontainer.json** to forward a port locally.
     # (Adding the "ports" property to this file will not forward from a Codespace.)
+
   haproxy:
     build:
       context: .
       dockerfile: Dockerfile.haproxy
     network_mode: service:dev
+
   nats-auth:
     image: natsio/nats-box:0.13.8
     command:
@@ -24,15 +28,18 @@ services:
     volumes:
       - nats-auth:/etc/nats-auth
       - ./setup-scripts:/tmp
-  nats-server:
+
+  nats:
     image: nats:alpine
+    restart: unless-stopped
     command:
+      - --jetstream
       - -c
       - /etc/nats/resolver.conf
       - -D
     depends_on:
       - nats-auth
-    network_mode: service:dev
+    # network_mode: service:dev
     volumes:
       - nats-auth:/etc/nats
 
