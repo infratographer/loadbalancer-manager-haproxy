@@ -1,11 +1,12 @@
 services:
   dev:
+    image: devcontainer
     build:
       context: .
       dockerfile: Dockerfile
     command: sleep infinity
     depends_on:
-      - nats
+      - nats-init
     volumes:
       - ..:/workspaces:cached
       - nats-auth:/etc/nats-auth
@@ -42,6 +43,34 @@ services:
     # network_mode: service:dev
     volumes:
       - nats-auth:/etc/nats
+
+  nats-init:
+    image: devcontainer
+    depends_on:
+      - nats
+    restart: on-failure
+    command:
+      [
+        "nats",
+        "stream",
+        "--server=nats",
+        "add",
+        "loadbalancer-manager-haproxy",
+        "--subjects=com.infratographer.>",
+        "--storage=memory",
+        "--replicas=1",
+        "--retention=limits",
+        "--discard=old",
+        "--max-msgs=-1",
+        "--max-msgs-per-subject=-1",
+        "--max-bytes=-1",
+        "--max-age=-1",
+        "--max-msg-size=-1",
+        "--dupe-window='2m0s'",
+        "--no-allow-rollup",
+        "--deny-delete",
+        "--deny-purge"
+      ]
 
 volumes:
   nats-auth:
