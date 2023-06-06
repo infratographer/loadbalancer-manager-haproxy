@@ -2,6 +2,8 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
 	"strings"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -9,6 +11,11 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
+
+	"go.infratographer.com/x/loggingx"
+	"go.infratographer.com/x/versionx"
+
+	"go.infratographer.com/loadbalancer-manager-haproxy/internal/config"
 )
 
 const appName = "loadbalancer-manager-haproxy"
@@ -36,14 +43,11 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/."+appName+".yaml)")
 
-	rootCmd.PersistentFlags().Bool("debug", false, "enable debug logging")
-	viperBindFlag("logging.debug", rootCmd.PersistentFlags().Lookup("debug"))
+	// Logging flags
+	loggingx.MustViperFlags(viper.GetViper(), rootCmd.PersistentFlags())
 
-	rootCmd.PersistentFlags().Bool("pretty", false, "enable pretty (human readable) logging output")
-	viperBindFlag("logging.pretty", rootCmd.PersistentFlags().Lookup("pretty"))
-
-	rootCmd.PersistentFlags().Bool("development", false, "enable development settings")
-	viperBindFlag("development", rootCmd.PersistentFlags().Lookup("development"))
+	// Register version command
+	versionx.RegisterCobraCommand(rootCmd, func() { versionx.PrintVersion(logger) })
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -66,7 +70,9 @@ func initConfig() {
 
 	viper.AutomaticEnv() // read in environment variables that match
 
-	setupLogging()
+	setupAppConfig()
+
+	logger = loggingx.InitLogger(appName, config.AppConfig.Logging)
 
 	// If a config file is found, read it in.
 	err := viper.ReadInConfig()
@@ -77,25 +83,15 @@ func initConfig() {
 	}
 }
 
-func setupLogging() {
-	cfg := zap.NewProductionConfig()
-	if viper.GetBool("logging.pretty") {
-		cfg = zap.NewDevelopmentConfig()
-	}
-
-	if viper.GetBool("logging.debug") {
-		cfg.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
-	} else {
-		cfg.Level = zap.NewAtomicLevelAt(zap.InfoLevel)
-	}
-
-	l, err := cfg.Build()
+// setupAppConfig loads our config.AppConfig struct with the values bound by
+// viper. Then, anywhere we need these values, we can just return to AppConfig
+// instead of performing viper.GetString(...), viper.GetBool(...), etc.
+func setupAppConfig() {
+	err := viper.Unmarshal(&config.AppConfig)
 	if err != nil {
-		panic(err)
+		fmt.Printf("unable to decode app config: %s", err)
+		os.Exit(1)
 	}
-
-	logger = l.Sugar().With("app", appName)
-	defer logger.Sync() //nolint:errcheck
 }
 
 // viperBindFlag provides a wrapper around the viper bindings that handles error checks

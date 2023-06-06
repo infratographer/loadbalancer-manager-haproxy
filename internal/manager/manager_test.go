@@ -232,36 +232,34 @@ func TestUpdateConfigToLatest(t *testing.T) {
 	})
 }
 
-func TestGetTargetLoadBalancerID(t *testing.T) {
+func TestLoadBalancerTargeted(t *testing.T) {
 	testcases := []struct {
-		name          string
-		pubsubMsg     events.ChangeMessage
-		exptectedLBID gidx.PrefixedID
-		errMsg        string
+		name             string
+		pubsubMsg        events.ChangeMessage
+		msgTargetedForLB bool
 	}{
 		{
-			name:      "failure to parse invalid subjectID",
-			pubsubMsg: events.ChangeMessage{SubjectID: "loadbal-"},
-			errMsg:    "invalid id",
-		},
-		{
-			name: "failure when loadbalancer id not found in the msg",
-			pubsubMsg: events.ChangeMessage{SubjectID: "loadprt-test",
-				AdditionalSubjectIDs: []gidx.PrefixedID{"loadpol-test"}},
-			errMsg: "not found",
-		},
-		{
-			name:          "get target loadbalancer gixd from SubjectID",
-			exptectedLBID: "loadbal-test",
+			name: "subjectID targeted for loadbalancer",
 			pubsubMsg: events.ChangeMessage{SubjectID: "loadbal-test",
 				AdditionalSubjectIDs: []gidx.PrefixedID{"loadpol-test"}},
+			msgTargetedForLB: true,
 		},
 		{
-			name:          "get target loadbalancer gixd from AdditionalSubjectIDs",
-			exptectedLBID: "loadbal-test",
+			name: "AdditionalSubjectID is targeted for loadbalancer",
 			pubsubMsg: events.ChangeMessage{SubjectID: "loadprt-test",
 				AdditionalSubjectIDs: []gidx.PrefixedID{"loadbal-test"}},
+			msgTargetedForLB: true,
 		},
+		{
+			name: "msg is not targeted for loadbalancer",
+			pubsubMsg: events.ChangeMessage{SubjectID: "loadprt-notme",
+				AdditionalSubjectIDs: []gidx.PrefixedID{"loadbal-notme"}},
+			msgTargetedForLB: false,
+		},
+	}
+
+	mgr := Manager{
+		ManagedLBID: "loadbal-test",
 	}
 
 	for _, tt := range testcases {
@@ -271,16 +269,8 @@ func TestGetTargetLoadBalancerID(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			lbID, err := getTargetLoadBalancerID(&tt.pubsubMsg)
-
-			if tt.errMsg != "" {
-				require.Error(t, err)
-				assert.ErrorContains(t, err, tt.errMsg)
-				return
-			}
-
-			assert.NoError(t, err)
-			assert.Equal(t, tt.exptectedLBID, lbID)
+			targeted := mgr.loadbalancerTargeted(&tt.pubsubMsg)
+			assert.Equal(t, tt.msgTargetedForLB, targeted)
 		})
 	}
 }

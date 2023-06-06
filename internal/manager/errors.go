@@ -9,9 +9,6 @@ var (
 	// errLoadBalancerIDParamInvalid is returned when an invalid load balancer ID is provided
 	errLoadBalancerIDParamInvalid = errors.New("optional loadbalancer ID param must be not set or set to a singular loadbalancer ID")
 
-	// errLoadbalancerIDNotFound is returned when a loadbalancer ID cannot be found in a nats message
-	errLoadbalancerIDNotFound = errors.New("loadbalancer ID not found in message")
-
 	// errFrontendSectionLabelFailure is returned when a frontend section cannot be created
 	errFrontendSectionLabelFailure = errors.New("failed to create frontend section with label")
 

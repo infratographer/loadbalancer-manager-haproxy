@@ -2,15 +2,15 @@ package cmd
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"os"
 	"os/signal"
-	"strings"
 
 	"go.infratographer.com/x/events"
 	"go.infratographer.com/x/gidx"
 	"go.uber.org/zap"
 
+	"go.infratographer.com/loadbalancer-manager-haproxy/internal/config"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/dataplaneapi"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/manager"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/pubsub"
@@ -81,19 +81,9 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 	}
 
 	// init other components
-
-	// init event subscriber
-	subscriberCfg := events.SubscriberConfig{
-		URL:     v.GetString("events.subscriber.url"),
-		Timeout: v.GetDuration("events.subscriber.timeout"),
-		Prefix:  v.GetString("events.subscriber.prefix"),
-	}
-
-	subscriberCfg.NATSConfig.CredsFile = viper.GetString("events.subscriber.nats.credsFile")
-
 	subscriber, err := pubsub.NewSubscriber(
 		ctx,
-		subscriberCfg,
+		config.AppConfig.Events.Subscriber,
 		pubsub.WithMsgHandler(mgr.ProcessMsg))
 
 	if err != nil {
@@ -125,45 +115,41 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 
 // validateMandatoryFlags collects the mandatory flag validation
 func validateMandatoryFlags() error {
-	errs := []string{}
+	errs := []error{}
 
 	if viper.GetString("events.subscriber.url") == "" {
-		errs = append(errs, ErrNATSURLRequired.Error())
-	}
-
-	if viper.GetString("events.subscriber.nats.credsFile") == "" {
-		errs = append(errs, ErrNATSAuthRequired.Error())
+		errs = append(errs, ErrSubscriberURLRequired)
 	}
 
 	if viper.GetString("events.subscriber.prefix") == "" {
-		errs = append(errs, ErrSubscriberPrefixRequired.Error())
+		errs = append(errs, ErrSubscriberPrefixRequired)
 	}
 
 	if len(viper.GetStringSlice("events.topics")) < 1 {
-		errs = append(errs, ErrSubscriberTopicsRequired.Error())
+		errs = append(errs, ErrSubscriberTopicsRequired)
 	}
 
 	if viper.GetString("haproxy.config.base") == "" {
-		errs = append(errs, ErrHAProxyBaseConfigRequired.Error())
+		errs = append(errs, ErrHAProxyBaseConfigRequired)
 	}
 
 	if viper.GetString("loadbalancerapi.url") == "" {
-		errs = append(errs, ErrLBAPIURLRequired.Error())
+		errs = append(errs, ErrLBAPIURLRequired)
 	}
 
 	if viper.GetString("loadbalancer.id") == "" {
-		errs = append(errs, ErrLBIDRequired.Error())
-	}
-
-	// check if the loadbalancer id is a valid gidx
-	_, err := gidx.Parse(viper.GetString("loadbalancer.id"))
-	if err != nil {
-		errs = append(errs, ErrLBIDInvalid.Error())
+		errs = append(errs, ErrLBIDRequired)
+	} else {
+		// check if the loadbalancer id is a valid gidx
+		_, err := gidx.Parse(viper.GetString("loadbalancer.id"))
+		if err != nil {
+			errs = append(errs, ErrLBIDInvalid)
+		}
 	}
 
 	if len(errs) == 0 {
 		return nil
 	}
 
-	return fmt.Errorf(strings.Join(errs, "\n")) //nolint:goerr113
+	return errors.Join(errs...) //nolint:goerr113
 }

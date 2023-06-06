@@ -13,7 +13,6 @@ import (
 	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
 
 	"go.infratographer.com/x/events"
-	"go.infratographer.com/x/gidx"
 	"go.uber.org/zap"
 
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -50,7 +49,7 @@ type Manager struct {
 	ManagedLBID     string
 	BaseCfgPath     string
 
-	// primarily for testing
+	// currentConfig for unit testing
 	currentConfig string
 }
 
@@ -88,49 +87,20 @@ func (m *Manager) Run() error {
 	return nil
 }
 
-const (
-	subjectPrefixLoadBalancer     = "loadbal"
-	subjectPrefixLoadBalancerPort = "loadprt"
-)
-
-// supportedPrefix returns true if the subject prefix is supported by this manager
-func supportedPrefix(prefix string) bool {
-	switch prefix {
-	case subjectPrefixLoadBalancer:
-		fallthrough
-	case subjectPrefixLoadBalancerPort:
+// loadbalancerTargeted returns true if this ChangeMessage is targeted to the
+// loadbalancerID the manager is configured to act on
+func (m Manager) loadbalancerTargeted(msg *events.ChangeMessage) bool {
+	if msg.SubjectID.String() == m.ManagedLBID {
 		return true
-	default:
-		return false
-	}
-}
-
-// getTargetLoadBalancerID returns the loadbalancer id from the message,
-// whether it is the SubjectID, or one of the AdditionalSubjectIds
-func getTargetLoadBalancerID(msg *events.ChangeMessage) (gidx.PrefixedID, error) {
-	var lbID gidx.PrefixedID
-
-	if msg.SubjectID.Prefix() == subjectPrefixLoadBalancer {
-		lbID = msg.SubjectID
 	} else {
 		for _, subject := range msg.AdditionalSubjectIDs {
-			if subject.Prefix() == subjectPrefixLoadBalancer {
-				lbID = subject
+			if subject.String() == m.ManagedLBID {
+				return true
 			}
 		}
 	}
 
-	if lbID.String() == "" {
-		return "", errLoadbalancerIDNotFound
-	}
-
-	// check if a valid gidx
-	lbID, err := gidx.Parse(lbID.String())
-	if err != nil {
-		return "", err
-	}
-
-	return lbID, nil
+	return false
 }
 
 // ProcessMsg message handler
@@ -141,31 +111,19 @@ func (m *Manager) ProcessMsg(msg *message.Message) error {
 		return err
 	}
 
-	subjectPrefix := changeMsg.SubjectID.Prefix()
-	if !supportedPrefix(subjectPrefix) {
-		m.Logger.Debugw("ignoring msg, not a supported prefix", zap.String("subject-prefix", subjectPrefix))
-		return nil
-	}
-
 	switch events.ChangeType(changeMsg.EventType) {
 	case events.CreateChangeType:
 		fallthrough
 	case events.UpdateChangeType:
-		targetLoadBalancerID, err := getTargetLoadBalancerID(&changeMsg)
-		if err != nil {
-			m.Logger.Errorw("failed to get target loadbalancer id", zap.Error(err))
-			return err
-		}
-
 		// drop msg, if not targeted for this lb
-		if targetLoadBalancerID.String() != m.ManagedLBID {
+		if !m.loadbalancerTargeted(&changeMsg) {
 			m.Logger.Debugw("ignoring msg, not targeted for this lb", zap.String("loadbalancer-id", m.ManagedLBID))
 			return nil
 		}
 
-		if err := m.updateConfigToLatest(targetLoadBalancerID.String()); err != nil {
+		if err := m.updateConfigToLatest(m.ManagedLBID); err != nil {
 			m.Logger.Errorw("failed to update haproxy config",
-				zap.String("loadbalancer.id", targetLoadBalancerID.String()),
+				zap.String("loadbalancer.id", m.ManagedLBID),
 				zap.Error(err))
 
 			return err
