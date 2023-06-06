@@ -40,7 +40,6 @@ services:
       - -D
     depends_on:
       - nats-auth
-    # network_mode: service:dev
     volumes:
       - nats-auth:/etc/nats
 

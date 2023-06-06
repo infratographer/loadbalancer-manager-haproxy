@@ -2,6 +2,7 @@ package pubsub
 
 import (
 	"context"
+	"sync"
 
 	"github.com/ThreeDotsLabs/watermill/message"
 	"go.infratographer.com/x/events"
@@ -14,7 +15,6 @@ type MsgHandler func(msg *message.Message) error
 // Subscriber is the subscriber client
 type Subscriber struct {
 	ctx            context.Context
-	url            string
 	changeChannels []<-chan *message.Message
 	msgHandler     MsgHandler
 	logger         *zap.SugaredLogger
@@ -39,7 +39,7 @@ func WithMsgHandler(cb MsgHandler) SubscriberOption {
 }
 
 // NewSubscriber creates a new Subscriber
-func NewSubscriber(ctx context.Context, url string, cfg events.SubscriberConfig, opts ...SubscriberOption) (*Subscriber, error) {
+func NewSubscriber(ctx context.Context, cfg events.SubscriberConfig, opts ...SubscriberOption) (*Subscriber, error) {
 	sub, err := events.NewSubscriber(cfg)
 	if err != nil {
 		return nil, err
@@ -47,7 +47,6 @@ func NewSubscriber(ctx context.Context, url string, cfg events.SubscriberConfig,
 
 	s := &Subscriber{
 		ctx:        ctx,
-		url:        url,
 		logger:     zap.NewNop().Sugar(),
 		subscriber: sub,
 	}
@@ -55,6 +54,8 @@ func NewSubscriber(ctx context.Context, url string, cfg events.SubscriberConfig,
 	for _, opt := range opts {
 		opt(s)
 	}
+
+	s.logger.Debugw("subscriber configuration", cfg)
 
 	return s, nil
 }
@@ -71,42 +72,42 @@ func (s *Subscriber) Subscribe(topic string) error {
 	return nil
 }
 
-// Ack acknowledges a message
-func (s *Subscriber) Ack(msg *message.Message) {
-	msg.Ack()
-}
-
-// Nack negative acknowledges a message
-func (s *Subscriber) Nack(msg *message.Message) {
-	msg.Nack()
-}
-
 // Listen start listening for messages on registered subjects and calls the registered message handler
-func (s *Subscriber) Listen() error {
+func (s Subscriber) Listen() error {
+	wg := &sync.WaitGroup{}
+
 	if s.msgHandler == nil {
 		return ErrMsgHandlerNotRegistered
 	}
 
 	// goroutine for each change channel
 	for _, ch := range s.changeChannels {
-		go s.listen(ch)
+		wg.Add(1)
+
+		go s.listen(ch, wg)
 	}
+
+	wg.Wait()
 
 	return nil
 }
 
 // listen listens for messages on a channel and calls the registered message handler
-func (s Subscriber) listen(ch <-chan *message.Message) {
-	for msg := range ch {
+func (s Subscriber) listen(messages <-chan *message.Message, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	for msg := range messages {
 		if err := s.msgHandler(msg); err != nil {
 			s.logger.Warn("Failed to process msg: ", err)
+		} else {
+			msg.Ack()
 		}
 	}
 }
 
 // Close closes the nats connection and unsubscribes from all subscriptions
 func (s *Subscriber) Close() error {
-	// TODO: once @tyler's PR is merged, return this
+	// TODO - @rizzza - 6/5/2023 - once @tyler's PR is merged and released, return this
 	// return s.subscriber.Close()
 	return nil
 }

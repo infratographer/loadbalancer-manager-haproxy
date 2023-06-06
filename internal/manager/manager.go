@@ -36,9 +36,7 @@ type dataPlaneAPI interface {
 
 type eventSubscriber interface {
 	Listen() error
-	Ack(msg *message.Message) error
-	Nack(msg *message.Message) error
-	Subscribe(subject string) error
+	Subscribe(topic string) error
 	Close() error
 }
 
@@ -59,6 +57,18 @@ type Manager struct {
 // Run subscribes to a NATS subject and updates the haproxy config via dataplaneapi
 func (m *Manager) Run() error {
 	m.Logger.Info("Starting manager")
+
+	if m.DataPlaneClient == nil {
+		m.Logger.Fatal("dataplane api is not initialized")
+	}
+
+	if m.LBClient == nil {
+		m.Logger.Fatal("loadbalancer api client is not initialized")
+	}
+
+	if m.Subscriber == nil {
+		m.Logger.Fatal("pubsub subscriber client is not initialized")
+	}
 
 	// wait until the Data Plane API is running
 	if err := m.waitForDataPlaneReady(dataPlaneAPIRetryLimit, dataPlaneAPIRetrySleep); err != nil {
@@ -124,7 +134,7 @@ func getTargetLoadBalancerID(msg *events.ChangeMessage) (gidx.PrefixedID, error)
 }
 
 // ProcessMsg message handler
-func (m Manager) ProcessMsg(msg *message.Message) error {
+func (m *Manager) ProcessMsg(msg *message.Message) error {
 	changeMsg, err := events.UnmarshalChangeMessage(msg.Payload)
 	if err != nil {
 		m.Logger.Errorw("failed to process data in msg", zap.Error(err))
@@ -153,21 +163,11 @@ func (m Manager) ProcessMsg(msg *message.Message) error {
 			return nil
 		}
 
-		// todo - @rizzza - requires lbapi graph client
-		m.Logger.Warn("lbapi graph client is not implemented yet to update haproxy config")
+		if err := m.updateConfigToLatest(targetLoadBalancerID.String()); err != nil {
+			m.Logger.Errorw("failed to update haproxy config",
+				zap.String("loadbalancer.id", targetLoadBalancerID.String()),
+				zap.Error(err))
 
-		if false {
-			if err := m.updateConfigToLatest(targetLoadBalancerID.String()); err != nil {
-				m.Logger.Errorw("failed to update haproxy config",
-					zap.String("loadbalancer.id", targetLoadBalancerID.String()),
-					zap.Error(err))
-
-				return err
-			}
-		}
-
-		if err := m.Subscriber.Ack(msg); err != nil {
-			m.Logger.Errorw("failed to ack msg", zap.Error(err), zap.String("subjectID", changeMsg.SubjectID.String()))
 			return err
 		}
 	default:
@@ -244,7 +244,7 @@ func mergeConfig(cfg parser.Parser, lb *lbapi.GetLoadBalancer) (parser.Parser, e
 		}
 
 		if err := cfg.Insert(parser.Frontends, p.Node.ID, "bind", types.Bind{
-			// TODO AddressFamily
+			// TODO AddressFamily?
 			Path: fmt.Sprintf("%s@:%d", "ipv4", p.Node.Number)}); err != nil {
 			return nil, newAttrError(errFrontendBindFailure, err)
 		}

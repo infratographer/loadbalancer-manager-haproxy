@@ -62,7 +62,6 @@ func initConfig() {
 	}
 
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
-	// TODO: This needs to match [a-z]+, this may not be true for your app name
 	viper.SetEnvPrefix("loadbalancer-manager-haproxy")
 
 	viper.AutomaticEnv() // read in environment variables that match

@@ -32,16 +32,7 @@ var runCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(runCmd)
 
-	// runCmd.PersistentFlags().String("nats-url", "", "NATS server connection url")
-	// viperBindFlag("nats.url", runCmd.PersistentFlags().Lookup("nats-url"))
-
-	// runCmd.PersistentFlags().String("nats-creds", "", "Path to the file containing the NATS credentials")
-	// viperBindFlag("nats.creds", runCmd.PersistentFlags().Lookup("nats-creds"))
-
-	// runCmd.PersistentFlags().String("nats-subject-prefix", "com.infratographer", "prefix for NATS subjects")
-	// viperBindFlag("nats.subject-prefix", runCmd.PersistentFlags().Lookup("nats-subject-prefix"))
-
-	runCmd.PersistentFlags().StringSlice("events-topics", []string{"*.load-balancer"}, "event topics to subscribe to")
+	runCmd.PersistentFlags().StringSlice("events-topics", []string{}, "event topics to subscribe to")
 	viperBindFlag("events.topics", runCmd.PersistentFlags().Lookup("events-topics"))
 
 	runCmd.PersistentFlags().String("dataplane-user-name", "haproxy", "DataplaneAPI user name")
@@ -81,23 +72,27 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 	}()
 
 	mgr := &manager.Manager{
-		Context:     ctx,
-		Logger:      logger,
-		ManagedLBID: viper.GetString("loadbalancer.id"),
-		BaseCfgPath: viper.GetString("haproxy.config.base"),
+		Context:         ctx,
+		Logger:          logger,
+		DataPlaneClient: dataplaneapi.NewClient(viper.GetString("dataplane.url")),
+		LBClient:        lbapi.NewClient(viper.GetString("loadbalancerapi.url")),
+		ManagedLBID:     viper.GetString("loadbalancer.id"),
+		BaseCfgPath:     viper.GetString("haproxy.config.base"),
 	}
 
 	// init other components
-	mgr.DataPlaneClient = dataplaneapi.NewClient(viper.GetString("dataplane.url"))
-	mgr.LBClient = lbapi.NewClient(viper.GetString("loadbalancerapi.url"))
 
-	// TODO: @rizzza - initialize events.Subscriber
 	// init event subscriber
-	subscriberCfg := events.SubscriberConfigFromViper(v)
+	subscriberCfg := events.SubscriberConfig{
+		URL:     v.GetString("events.subscriber.url"),
+		Timeout: v.GetDuration("events.subscriber.timeout"),
+		Prefix:  v.GetString("events.subscriber.prefix"),
+	}
+
 	subscriberCfg.NATSConfig.CredsFile = viper.GetString("events.subscriber.nats.credsFile")
 
-	sub, err := pubsub.NewSubscriber(ctx,
-		viper.GetString("events.subscriber.url"),
+	subscriber, err := pubsub.NewSubscriber(
+		ctx,
 		subscriberCfg,
 		pubsub.WithMsgHandler(mgr.ProcessMsg))
 
@@ -106,8 +101,10 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 		return err
 	}
 
+	mgr.Subscriber = subscriber
+
 	for _, topic := range viper.GetStringSlice("events.topics") {
-		if err := sub.Subscribe(topic); err != nil {
+		if err := mgr.Subscriber.Subscribe(topic); err != nil {
 			logger.Errorw("failed to subscribe to changes topic", zap.String("topic", topic), zap.Error(err))
 			return err
 		}
@@ -115,32 +112,9 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 
 	defer func() {
 		if err := mgr.Subscriber.Close(); err != nil {
-			mgr.Logger.Errorw("failed to shutdown nats client", zap.Error(err))
+			mgr.Logger.Errorw("failed to shutdown events subscriber", zap.Error(err))
 		}
 	}()
-
-	// setup, connect to nats and subscribe to subjects
-	// mgr.NatsClient = pubsub.NewNatsClient(ctx, viper.GetString("nats.url"),
-	// 	pubsub.WithUserCredentials(viper.GetString("nats.creds")),
-	// 	pubsub.WithLogger(logger),
-	// 	pubsub.WithMsgHandler(mgr.ProcessMsg),
-	// )
-
-	// if err := mgr.NatsClient.Connect(); err != nil {
-	// 	logger.Error("failed to connect to nats server", zap.Error(err))
-	// 	return err
-	// }
-
-	// subjects := viper.GetStringSlice("nats.subjects")
-	// prefix := viper.GetString("nats.subject-prefix")
-
-	// for _, subject := range subjects {
-	// 	prefixedSubjectQueue := fmt.Sprintf("%s.%s", prefix, subject)
-	// 	if err := mgr.NatsClient.Subscribe(prefixedSubjectQueue); err != nil {
-	// 		logger.Errorw("failed to subscribe to queue ", zap.String("subject", prefixedSubjectQueue))
-	// 		return err
-	// 	}
-	// }
 
 	if err := mgr.Run(); err != nil {
 		logger.Fatalw("failed starting manager", "error", err)

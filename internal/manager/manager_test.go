@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ThreeDotsLabs/watermill/message"
 	parser "github.com/haproxytech/config-parser/v4"
@@ -18,8 +19,10 @@ import (
 
 	"go.infratographer.com/x/events"
 	"go.infratographer.com/x/gidx"
+	"go.infratographer.com/x/testing/eventtools"
 
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/manager/mock"
+	"go.infratographer.com/loadbalancer-manager-haproxy/internal/pubsub"
 	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
 )
 
@@ -342,13 +345,10 @@ func TestProcessMsg(t *testing.T) {
 		t.Parallel()
 
 		mockDataplaneAPI := &mock.DataplaneAPIClient{
-			DoPostConfig: func(ctx context.Context, config string) error {
+			DoCheckConfig: func(ctx context.Context, config string) error {
 				return nil
 			},
-		}
-
-		mockSubscriber := &mock.Subscriber{
-			DoAck: func(msg *message.Message) error {
+			DoPostConfig: func(ctx context.Context, config string) error {
 				return nil
 			},
 		}
@@ -366,7 +366,6 @@ func TestProcessMsg(t *testing.T) {
 		mgr := Manager{
 			Logger:          logger,
 			DataPlaneClient: mockDataplaneAPI,
-			Subscriber:      mockSubscriber,
 			LBClient:        mockLBAPI,
 			ManagedLBID:     "loadbal-managedbythisprocess",
 		}
@@ -380,8 +379,134 @@ func TestProcessMsg(t *testing.T) {
 			Payload: data,
 		}
 
-		err := mgr.ProcessMsg(eventMsg)
+		err = mgr.ProcessMsg(eventMsg)
 		require.Nil(t, err)
+	})
+}
+
+func TestEventsIntegration(t *testing.T) {
+	l, _ := zap.NewDevelopmentConfig().Build()
+	logger := l.Sugar()
+
+	t.Run("events integration", func(t *testing.T) {
+		t.Parallel()
+
+		pubCfg, subCfg, err := eventtools.NewNatsServer()
+		require.NoError(t, err)
+
+		mockDataplaneAPI := &mock.DataplaneAPIClient{
+			DoCheckConfig: func(ctx context.Context, config string) error {
+				return nil
+			},
+			DoPostConfig: func(ctx context.Context, config string) error {
+				return nil
+			},
+		}
+
+		mockLBAPI := &mock.LBAPIClient{
+			DoGetLoadBalancer: func(ctx context.Context, id string) (*lbapi.GetLoadBalancer, error) {
+				return &lbapi.GetLoadBalancer{
+					LoadBalancer: lbapi.LoadBalancer{
+						ID: "loadbal-managedbythisprocess",
+						Ports: lbapi.Ports{
+							Edges: []lbapi.PortEdges{
+								{
+									Node: lbapi.PortNode{
+										ID:     "loadprt-test",
+										Name:   "ssh-service",
+										Number: 22,
+										Pools: []lbapi.Pool{
+											{
+												ID:       "loadpol-test",
+												Name:     "ssh-service-a",
+												Protocol: "tcp",
+												Origins: lbapi.Origins{
+													Edges: []lbapi.OriginEdges{
+														{
+															Node: lbapi.OriginNode{
+																ID:         "loadogn-test1",
+																Name:       "svr1-2222",
+																Target:     "1.2.3.4",
+																PortNumber: 2222,
+																Active:     true,
+															},
+														},
+														{
+															Node: lbapi.OriginNode{
+																ID:         "loadogn-test2",
+																Name:       "svr1-222",
+																Target:     "1.2.3.4",
+																PortNumber: 222,
+																Active:     true,
+															},
+														},
+														{
+															Node: lbapi.OriginNode{
+																ID:         "loadogn-test3",
+																Name:       "svr2",
+																Target:     "4.3.2.1",
+																PortNumber: 2222,
+																Active:     false,
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}, nil
+			},
+		}
+
+		mgr := Manager{
+			BaseCfgPath:     "../../.devcontainer/config/haproxy.cfg",
+			Logger:          logger,
+			DataPlaneClient: mockDataplaneAPI,
+			LBClient:        mockLBAPI,
+			ManagedLBID:     "loadbal-managedbythisprocess",
+		}
+
+		// setup timeout context to break free from pubsub Listen()
+		ctx, cancel := context.WithTimeout(context.TODO(), time.Duration(1*time.Second))
+		defer cancel()
+
+		// subscribe
+		subscriber, err := pubsub.NewSubscriber(ctx, subCfg, pubsub.WithMsgHandler(mgr.ProcessMsg))
+		require.NoError(t, err)
+		require.NotNil(t, subscriber)
+
+		mgr.Subscriber = subscriber
+
+		err = mgr.Subscriber.Subscribe("create.loadbalancer")
+		require.NoError(t, err)
+
+		// publish
+		publisher, err := events.NewPublisher(pubCfg)
+		require.NoError(t, err)
+
+		err = publisher.PublishChange(
+			context.Background(),
+			"loadbalancer",
+			events.ChangeMessage{
+				SubjectID: "loadbal-managedbythisprocess",
+				EventType: string(events.CreateChangeType),
+			})
+		require.NoError(t, err)
+
+		err = mgr.Subscriber.Listen()
+		require.Nil(t, err)
+
+		// check currentConfig (testing helper variable)
+		assert.NotEmpty(t, mgr.currentConfig)
+
+		expCfg, err := os.ReadFile(fmt.Sprintf("%s/%s", testDataBaseDir, "lb-ex-1-exp.cfg"))
+		require.Nil(t, err)
+
+		assert.Equal(t, strings.TrimSpace(string(expCfg)), strings.TrimSpace(mgr.currentConfig))
 	})
 }
 
