@@ -8,7 +8,8 @@
                 "dev",
                 "haproxy",
                 "nats-auth",
-                "nats"
+                "nats",
+                "nats-init"
         ],
         "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
         "customizations": {

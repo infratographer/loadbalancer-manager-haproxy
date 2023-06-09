@@ -59,7 +59,7 @@ services:
         "--creds=/etc/nats-auth/manager.creds",
         "add",
         "loadbalancer-manager-haproxy",
-        "--subjects=com.infratographer.changes.>",
+        "--subjects=com.infratographer.>",
         "--storage=memory",
         "--replicas=1",
         "--retention=limits",
