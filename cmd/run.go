@@ -8,6 +8,7 @@ import (
 
 	"go.infratographer.com/x/events"
 	"go.infratographer.com/x/gidx"
+	"go.infratographer.com/x/viperx"
 	"go.uber.org/zap"
 
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/config"
@@ -15,6 +16,7 @@ import (
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/manager"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/pubsub"
 	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
+	"go.infratographer.com/loadbalancer-manager-haproxy/x/oauth2x"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -33,27 +35,28 @@ func init() {
 	rootCmd.AddCommand(runCmd)
 
 	runCmd.PersistentFlags().StringSlice("events-topics", []string{}, "event topics to subscribe to")
-	viperBindFlag("events.topics", runCmd.PersistentFlags().Lookup("events-topics"))
+	viperx.MustBindFlag(viper.GetViper(), "events.topics", runCmd.PersistentFlags().Lookup("events-topics"))
 
 	runCmd.PersistentFlags().String("dataplane-user-name", "haproxy", "DataplaneAPI user name")
-	viperBindFlag("dataplane.user.name", runCmd.PersistentFlags().Lookup("dataplane-user-name"))
+	viperx.MustBindFlag(viper.GetViper(), "dataplane.user.name", runCmd.PersistentFlags().Lookup("dataplane-user-name"))
 
 	runCmd.PersistentFlags().String("dataplane-user-pwd", "adminpwd", "DataplaneAPI user password")
-	viperBindFlag("dataplane.user.pwd", runCmd.PersistentFlags().Lookup("dataplane-user-pwd"))
+	viperx.MustBindFlag(viper.GetViper(), "dataplane.user.pwd", runCmd.PersistentFlags().Lookup("dataplane-user-pwd"))
 
 	runCmd.PersistentFlags().String("dataplane-url", "http://127.0.0.1:5555/v2/", "DataplaneAPI base url")
-	viperBindFlag("dataplane.url", runCmd.PersistentFlags().Lookup("dataplane-url"))
+	viperx.MustBindFlag(viper.GetViper(), "dataplane.url", runCmd.PersistentFlags().Lookup("dataplane-url"))
 
 	runCmd.PersistentFlags().String("base-haproxy-config", "", "Base config for haproxy")
-	viperBindFlag("haproxy.config.base", runCmd.PersistentFlags().Lookup("base-haproxy-config"))
+	viperx.MustBindFlag(viper.GetViper(), "haproxy.config.base", runCmd.PersistentFlags().Lookup("base-haproxy-config"))
 
 	runCmd.PersistentFlags().String("loadbalancerapi-url", "", "LoadbalancerAPI url")
-	viperBindFlag("loadbalancerapi.url", runCmd.PersistentFlags().Lookup("loadbalancerapi-url"))
+	viperx.MustBindFlag(viper.GetViper(), "loadbalancerapi.url", runCmd.PersistentFlags().Lookup("loadbalancerapi-url"))
 
 	runCmd.PersistentFlags().String("loadbalancer-id", "", "Loadbalancer ID to act on event changes")
-	viperBindFlag("loadbalancer.id", runCmd.PersistentFlags().Lookup("loadbalancer-id"))
+	viperx.MustBindFlag(viper.GetViper(), "loadbalancer.id", runCmd.PersistentFlags().Lookup("loadbalancer-id"))
 
 	events.MustViperFlagsForSubscriber(viper.GetViper(), runCmd.PersistentFlags())
+	oauth2x.MustViperFlags(viper.GetViper(), runCmd.Flags())
 }
 
 func run(cmdCtx context.Context, v *viper.Viper) error {
@@ -80,7 +83,17 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 		BaseCfgPath:     viper.GetString("haproxy.config.base"),
 	}
 
-	// init other components
+	// init lbapi client
+	if config.AppConfig.OIDC.ClientID != "" {
+		oauthHTTPClient := oauth2x.NewClient(ctx, oauth2x.NewClientCredentialsTokenSrc(ctx, config.AppConfig.OIDC))
+		mgr.LBClient = lbapi.NewClient(viper.GetString("loadbalancerapi.url"),
+			lbapi.WithHTTPClient(oauthHTTPClient),
+		)
+	} else {
+		mgr.LBClient = lbapi.NewClient(viper.GetString("loadbalancerapi.url"))
+	}
+
+	// init events subscriber
 	subscriber, err := pubsub.NewSubscriber(
 		ctx,
 		config.AppConfig.Events.Subscriber,

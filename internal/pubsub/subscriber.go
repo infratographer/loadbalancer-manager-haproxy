@@ -107,7 +107,5 @@ func (s Subscriber) listen(messages <-chan *message.Message, wg *sync.WaitGroup)
 
 // Close closes the nats connection and unsubscribes from all subscriptions
 func (s *Subscriber) Close() error {
-	// TODO - @rizzza - 6/5/2023 - once @tyler's PR is merged and released, return this
-	// return s.subscriber.Close()
-	return nil
+	return s.subscriber.Close()
 }

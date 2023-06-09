@@ -15,13 +15,32 @@ type GQLClient interface {
 
 // Client creates a new lb api client against a specific endpoint
 type Client struct {
-	client GQLClient
+	gqlCli     GQLClient
+	httpClient *http.Client
 }
 
+// ClientOption is a function that modifies a client
+type ClientOption func(*Client)
+
 // NewClient creates a new lb api client
-func NewClient(url string) *Client {
-	return &Client{
-		client: graphql.NewClient(url, &http.Client{}),
+func NewClient(url string, opts ...ClientOption) *Client {
+	c := &Client{
+		httpClient: http.DefaultClient,
+	}
+
+	for _, opt := range opts {
+		opt(c)
+	}
+
+	c.gqlCli = graphql.NewClient(url, c.httpClient)
+
+	return c
+}
+
+// WithHTTPClient functional option to set the http client
+func WithHTTPClient(cli *http.Client) ClientOption {
+	return func(c *Client) {
+		c.httpClient = cli
 	}
 }
 
@@ -37,7 +56,7 @@ func (c *Client) GetLoadBalancer(ctx context.Context, id string) (*GetLoadBalanc
 	}
 
 	var lb GetLoadBalancer
-	if err := c.client.Query(ctx, &lb, vars); err != nil {
+	if err := c.gqlCli.Query(ctx, &lb, vars); err != nil {
 		return nil, err
 	}
 

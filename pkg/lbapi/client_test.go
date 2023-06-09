@@ -27,7 +27,7 @@ func newGQLClientMock() *mock.GQLClient {
 
 func TestGetLoadBalancer(t *testing.T) {
 	cli := Client{
-		client: newGQLClientMock(),
+		gqlCli: newGQLClientMock(),
 	}
 
 	lb, err := cli.GetLoadBalancer(context.Background(), "badprefix-test")

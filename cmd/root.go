@@ -8,7 +8,6 @@ import (
 
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 
@@ -91,12 +90,5 @@ func setupAppConfig() {
 	if err != nil {
 		fmt.Printf("unable to decode app config: %s", err)
 		os.Exit(1)
-	}
-}
-
-// viperBindFlag provides a wrapper around the viper bindings that handles error checks
-func viperBindFlag(name string, flag *pflag.Flag) {
-	if err := viper.BindPFlag(name, flag); err != nil {
-		panic(err)
 	}
 }
