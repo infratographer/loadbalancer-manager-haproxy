@@ -6,12 +6,14 @@ nsc add operator -n TEST-OPERATOR --sys --generate-signing-key
 
 echo "Creating NATS Account"
 nsc add account -n TEST-ACCOUNT
+nsc edit account TEST-ACCOUNT --js-mem-storage -1 --js-disk-storage -1 --js-streams -1 --js-consumer -1
+# --sk generate
 
 echo "Creating NATS User"
 nsc add user -a TEST-ACCOUNT -n MANAGER
 
 echo "Generate NATS server config"
-mkdir /etc/nats-auth
+mkdir -p /etc/nats-auth
 nsc generate config --mem-resolver --sys-account SYS > /etc/nats-auth/resolver.conf
 
 echo "Save NATS User creds"
