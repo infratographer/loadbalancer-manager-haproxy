@@ -4,13 +4,6 @@
         "dockerComposeFile": "docker-compose.yaml",
         "service": "dev",
         "shutdownAction": "stopCompose",
-        "runServices": [
-                "dev",
-                "haproxy",
-                "nats-auth",
-                "nats",
-                "nats-init"
-        ],
         "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
         "customizations": {
                 // Configure properties specific to VS Code.
