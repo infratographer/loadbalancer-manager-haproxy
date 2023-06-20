@@ -1,4 +1,4 @@
-FROM bitnami/haproxy:2.7.8
+FROM bitnami/haproxy:2.8.0
 
 COPY config/haproxy.cfg /bitnami/haproxy/conf/haproxy.cfg
 COPY config/dataplaneapi.cfg /bitnami/haproxy/conf/dataplaneapi.cfg
