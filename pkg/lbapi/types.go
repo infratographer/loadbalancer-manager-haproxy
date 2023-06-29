@@ -38,8 +38,13 @@ type Ports struct {
 	Edges []PortEdges
 }
 
+type OwnerNode struct {
+	ID string
+}
+
 type LoadBalancer struct {
 	ID    string
+	Owner OwnerNode
 	Name  string
 	Ports Ports
 }
@@ -52,6 +57,7 @@ type GetLoadBalancer struct {
 // type GetLoadBalancer struct {
 // 	LoadBalancer struct {
 // 		ID    string
+//      Owner string
 // 		Name  string
 // 		Ports struct {
 // 			Edges []struct {

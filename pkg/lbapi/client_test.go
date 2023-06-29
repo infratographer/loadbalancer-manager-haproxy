@@ -17,6 +17,7 @@ func newGQLClientMock() *mock.GQLClient {
 		if ok {
 			lb.LoadBalancer.ID = "loadbal-test"
 			lb.LoadBalancer.Name = "test"
+			lb.LoadBalancer.Owner.ID = "testtnt-test"
 		}
 
 		return nil
@@ -41,4 +42,5 @@ func TestGetLoadBalancer(t *testing.T) {
 
 	assert.Equal(t, lb.LoadBalancer.ID, "loadbal-test")
 	assert.Equal(t, lb.LoadBalancer.Name, "test")
+	assert.Equal(t, lb.LoadBalancer.Owner.ID, "testtnt-test")
 }
