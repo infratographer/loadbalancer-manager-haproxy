@@ -47,12 +47,12 @@ type LocationNode struct {
 }
 
 type LoadBalancer struct {
-	ID                    string
-	Name                  string
-	Owner                 OwnerNode
-	Location              LocationNode
-	IPAddressableFragment `graphql:"... on IPAddressable"`
-	Ports                 Ports
+	ID          string
+	Name        string
+	Owner       OwnerNode
+	Location    LocationNode
+	IPAddresses []IPAddress `graphql:"IPAddresses" json:"IPAddresses"`
+	Ports       Ports
 }
 
 type GetLoadBalancer struct {
@@ -63,10 +63,6 @@ type IPAddress struct {
 	ID       string
 	IP       string
 	Reserved bool
-}
-
-type IPAddressableFragment struct {
-	IPAddresses []IPAddress `graphql:"IPAddresses" json:"IPAddresses"`
 }
 
 // Readable version of the above:
