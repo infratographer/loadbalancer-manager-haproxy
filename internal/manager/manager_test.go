@@ -381,7 +381,7 @@ func TestEventsIntegration(t *testing.T) {
 	t.Run("events integration", func(t *testing.T) {
 		t.Parallel()
 
-		pubCfg, subCfg, err := eventtools.NewNatsServer()
+		natsSrv, err := eventtools.NewNatsServer()
 		require.NoError(t, err)
 
 		mockDataplaneAPI := &mock.DataplaneAPIClient{
@@ -465,7 +465,7 @@ func TestEventsIntegration(t *testing.T) {
 		defer cancel()
 
 		// subscribe
-		subscriber, err := pubsub.NewSubscriber(ctx, subCfg, pubsub.WithMsgHandler(mgr.ProcessMsg))
+		subscriber, err := pubsub.NewSubscriber(ctx, natsSrv.SubscriberConfig, pubsub.WithMsgHandler(mgr.ProcessMsg))
 		require.NoError(t, err)
 		require.NotNil(t, subscriber)
 
@@ -475,7 +475,7 @@ func TestEventsIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// publish
-		publisher, err := events.NewPublisher(pubCfg)
+		publisher, err := events.NewPublisher(natsSrv.PublisherConfig)
 		require.NoError(t, err)
 
 		err = publisher.PublishChange(
