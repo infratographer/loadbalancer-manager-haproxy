@@ -11,12 +11,13 @@ import (
 	"go.infratographer.com/x/viperx"
 	"go.uber.org/zap"
 
+	"go.infratographer.com/x/oauth2x"
+
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/config"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/dataplaneapi"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/manager"
 	"go.infratographer.com/loadbalancer-manager-haproxy/internal/pubsub"
 	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
-	"go.infratographer.com/loadbalancer-manager-haproxy/x/oauth2x"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -84,8 +85,8 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 	}
 
 	// init lbapi client
-	if config.AppConfig.OIDC.ClientID != "" {
-		oauthHTTPClient := oauth2x.NewClient(ctx, oauth2x.NewClientCredentialsTokenSrc(ctx, config.AppConfig.OIDC))
+	if config.AppConfig.OIDC.Client.ID != "" {
+		oauthHTTPClient := oauth2x.NewClient(ctx, oauth2x.NewClientCredentialsTokenSrc(ctx, config.AppConfig.OIDC.Client))
 		mgr.LBClient = lbapi.NewClient(viper.GetString("loadbalancerapi.url"),
 			lbapi.WithHTTPClient(oauthHTTPClient),
 		)

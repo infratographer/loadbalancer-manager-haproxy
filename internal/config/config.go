@@ -5,7 +5,7 @@ import (
 	"go.infratographer.com/x/events"
 	"go.infratographer.com/x/loggingx"
 
-	"go.infratographer.com/loadbalancer-manager-haproxy/x/oauth2x"
+	"go.infratographer.com/x/oauth2x"
 )
 
 // EventsConfig stores the configuration for a load-balancer-api events config
@@ -13,8 +13,13 @@ type EventsConfig struct {
 	Subscriber events.SubscriberConfig
 }
 
+// OIDCClientConfig stores the configuration for an OIDC client
+type OIDCClientConfig struct {
+	Client oauth2x.Config
+}
+
 var AppConfig struct {
 	Events  EventsConfig
 	Logging loggingx.Config
-	OIDC    oauth2x.Config
+	OIDC    OIDCClientConfig
 }
