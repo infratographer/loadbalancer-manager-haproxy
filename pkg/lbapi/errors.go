@@ -5,12 +5,12 @@ import (
 )
 
 var (
-	// ErrLBHTTPUnauthorized is returned when the request is not authorized
-	ErrLBHTTPUnauthorized = errors.New("load balancer api received unauthorized request")
+	// ErrUnauthorized returned when the request is not authorized
+	ErrUnauthorized = errors.New("client is unauthorized")
 
-	// ErrLBHTTPNotfound is returned when the load balancer ID not found
-	ErrLBHTTPNotfound = errors.New("load balancer ID not found")
+	// ErrNotfound returned when the load balancer ID not found
+	ErrLBNotfound = errors.New("loadbalancer ID not found")
 
-	// ErrLBHTTPError is returned when the http response is an error
-	ErrLBHTTPError = errors.New("load balancer api http error")
+	// ErrLBHTTPError returned when the http response is an error
+	ErrHTTPError = errors.New("loadbalancer api http error")
 )

@@ -13,7 +13,17 @@ import (
 )
 
 func TestGetLoadBalancer(t *testing.T) {
-	respJSON := `{
+	cli := Client{}
+
+	t.Run("bad prefix", func(t *testing.T) {
+		lb, err := cli.GetLoadBalancer(context.Background(), "badprefix-test")
+		require.Error(t, err)
+		require.Nil(t, lb)
+		assert.ErrorContains(t, err, "invalid id")
+	})
+
+	t.Run("successful query", func(t *testing.T) {
+		respJSON := `{
 	"data": {
 		"loadBalancer": {
 			"id": "loadbal-randovalue",
@@ -45,18 +55,7 @@ func TestGetLoadBalancer(t *testing.T) {
 	}
 }`
 
-	cli := Client{
-		gqlCli: mustNewGQLTestClient(respJSON),
-	}
-
-	t.Run("bad prefix", func(t *testing.T) {
-		lb, err := cli.GetLoadBalancer(context.Background(), "badprefix-test")
-		require.Error(t, err)
-		require.Nil(t, lb)
-		assert.ErrorContains(t, err, "invalid id")
-	})
-
-	t.Run("successful query", func(t *testing.T) {
+		cli.gqlCli = mustNewGQLTestClient(respJSON, http.StatusOK)
 		lb, err := cli.GetLoadBalancer(context.Background(), "loadbal-randovalue")
 		require.NoError(t, err)
 		require.NotNil(t, lb)
@@ -76,11 +75,58 @@ func TestGetLoadBalancer(t *testing.T) {
 		assert.Equal(t, "192.168.1.1", lb.LoadBalancer.IPAddresses[1].IP)
 		assert.True(t, lb.LoadBalancer.IPAddresses[1].Reserved)
 	})
+
+	t.Run("unauthorized", func(t *testing.T) {
+		respJSON := `{"message":"invalid or expired jwt"}`
+
+		cli.gqlCli = mustNewGQLTestClient(respJSON, http.StatusUnauthorized)
+
+		lb, err := cli.GetLoadBalancer(context.Background(), "loadbal-randovalue")
+		require.Nil(t, lb)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrUnauthorized)
+	})
+
+	t.Run("not found", func(t *testing.T) {
+		respJSON := `{
+			"data": null
+			"errors": [
+				{
+					"message": "load_balancer not found"
+				}
+			]
+		}`
+
+		cli.gqlCli = mustNewGQLTestClient(respJSON, http.StatusUnauthorized)
+
+		lb, err := cli.GetLoadBalancer(context.Background(), "loadbal-randovalue")
+		require.Nil(t, lb)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, ErrLBNotfound)
+	})
+
+	t.Run("gql error", func(t *testing.T) {
+		respJSON := `{
+			"data": null
+			"errors": [
+				{
+					"message": "failed to find or parse something"
+				}
+			]
+		}`
+
+		cli.gqlCli = mustNewGQLTestClient(respJSON, http.StatusOK)
+
+		lb, err := cli.GetLoadBalancer(context.Background(), "loadbal-randovalue")
+		require.Nil(t, lb)
+		require.Error(t, err)
+	})
 }
 
-func mustNewGQLTestClient(respJSON string) *graphql.Client {
+func mustNewGQLTestClient(respJSON string, respCode int) *graphql.Client {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/query", func(w http.ResponseWriter, req *http.Request) {
+		w.WriteHeader(respCode)
 		w.Header().Set("Content-Type", "application/json")
 		_, err := io.WriteString(w, respJSON)
 		if err != nil {

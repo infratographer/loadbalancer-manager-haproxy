@@ -3,6 +3,7 @@ package lbapi
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/shurcooL/graphql"
 	"go.infratographer.com/x/gidx"
@@ -57,8 +58,18 @@ func (c *Client) GetLoadBalancer(ctx context.Context, id string) (*GetLoadBalanc
 
 	var lb GetLoadBalancer
 	if err := c.gqlCli.Query(ctx, &lb, vars); err != nil {
-		return nil, err
+		return nil, translateGQLErr(err)
 	}
 
 	return &lb, nil
+}
+
+func translateGQLErr(err error) error {
+	if strings.Contains(err.Error(), "not found") {
+		return ErrLBNotfound
+	} else if strings.Contains(err.Error(), "invalid or expired jwt") {
+		return ErrUnauthorized
+	}
+
+	return err
 }
