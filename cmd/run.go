@@ -85,7 +85,7 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 	}
 
 	// init lbapi client
-	if config.AppConfig.OIDC.Client.ID != "" {
+	if config.AppConfig.OIDC.Client.TokenURL != "" {
 		oauthHTTPClient := oauth2x.NewClient(ctx, oauth2x.NewClientCredentialsTokenSrc(ctx, config.AppConfig.OIDC.Client))
 		mgr.LBClient = lbapi.NewClient(viper.GetString("loadbalancerapi.url"),
 			lbapi.WithHTTPClient(oauthHTTPClient),

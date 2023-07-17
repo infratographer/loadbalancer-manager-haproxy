@@ -65,7 +65,7 @@ func (c *Client) GetLoadBalancer(ctx context.Context, id string) (*GetLoadBalanc
 }
 
 func translateGQLErr(err error) error {
-	if strings.Contains(err.Error(), "not found") {
+	if strings.Contains(err.Error(), "load_balancer not found") {
 		return ErrLBNotfound
 	} else if strings.Contains(err.Error(), "invalid or expired jwt") {
 		return ErrUnauthorized
