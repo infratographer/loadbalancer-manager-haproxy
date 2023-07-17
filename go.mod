@@ -3,7 +3,7 @@ module go.infratographer.com/loadbalancer-manager-haproxy
 go 1.20
 
 require (
-	github.com/ThreeDotsLabs/watermill v1.2.0
+	github.com/ThreeDotsLabs/watermill v1.3.2
 	github.com/haproxytech/config-parser/v4 v4.1.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/shurcooL/graphql v0.0.0-20220606043923-3cf50f8a0a29
