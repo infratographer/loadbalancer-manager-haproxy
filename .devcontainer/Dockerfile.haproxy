@@ -1,7 +1,7 @@
 FROM bitnami/haproxy:2.8.1
 
 COPY config/haproxy.cfg /bitnami/haproxy/conf/haproxy.cfg
-COPY config/dataplaneapi.cfg /bitnami/haproxy/conf/dataplaneapi.cfg
+COPY config/dataplaneapi.yaml /bitnami/haproxy/conf/dataplaneapi.yaml
 
 USER root
 RUN chown -R 1001:1001 /bitnami && \
