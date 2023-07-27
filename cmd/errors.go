@@ -9,7 +9,7 @@ var (
 	// ErrSubscriberPrefixRequired is returned when a NATS subject prefix is missing
 	ErrSubscriberPrefixRequired = errors.New("env LOADBALANCER_MANAGER_HAPROXY_EVENTS_SUBSCRIBER_PREFIX is required and cannot be empty")
 
-	ErrSubscriberTopicsRequired = errors.New("event-topics is required and cannot be empty")
+	ErrSubscriberTopicsRequired = errors.New("change-topics is required and cannot be empty")
 
 	// ErrNATSAuthRequired is returned when a NATS auth method is missing
 	ErrNATSAuthRequired = errors.New("env LOADBALANCER_MANAGER_HAPROXY_EVENTS_SUBSCRIBER_NATS_CREDSFILE is required and cannot be empty")

@@ -35,8 +35,8 @@ var runCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(runCmd)
 
-	runCmd.PersistentFlags().StringSlice("events-topics", []string{}, "event topics to subscribe to")
-	viperx.MustBindFlag(viper.GetViper(), "events.topics", runCmd.PersistentFlags().Lookup("events-topics"))
+	runCmd.PersistentFlags().StringSlice("change-topics", []string{}, "event change topics to subscribe to")
+	viperx.MustBindFlag(viper.GetViper(), "change-topics", runCmd.PersistentFlags().Lookup("change-topics"))
 
 	runCmd.PersistentFlags().String("dataplane-user-name", "haproxy", "DataplaneAPI user name")
 	viperx.MustBindFlag(viper.GetViper(), "dataplane.user.name", runCmd.PersistentFlags().Lookup("dataplane-user-name"))
@@ -84,6 +84,8 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 		BaseCfgPath:     viper.GetString("haproxy.config.base"),
 	}
 
+	logger.Infow("Initializing...", zap.String("loadbalancerID", viper.GetString("loadbalancer.id")))
+
 	// init lbapi client
 	if config.AppConfig.OIDC.Client.Issuer != "" {
 		oidcTS, err := oauth2x.NewClientCredentialsTokenSrc(ctx, config.AppConfig.OIDC.Client)
@@ -103,7 +105,9 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 	subscriber, err := pubsub.NewSubscriber(
 		ctx,
 		config.AppConfig.Events.Subscriber,
-		pubsub.WithMsgHandler(mgr.ProcessMsg))
+		pubsub.WithMsgHandler(mgr.ProcessMsg),
+		pubsub.WithLogger(logger),
+	)
 
 	if err != nil {
 		logger.Errorw("failed to create subscriber", zap.Error(err))
@@ -112,7 +116,7 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 
 	mgr.Subscriber = subscriber
 
-	for _, topic := range viper.GetStringSlice("events.topics") {
+	for _, topic := range viper.GetStringSlice("change-topics") {
 		if err := mgr.Subscriber.Subscribe(topic); err != nil {
 			logger.Errorw("failed to subscribe to changes topic", zap.String("topic", topic), zap.Error(err))
 			return err
@@ -144,7 +148,7 @@ func validateMandatoryFlags() error {
 		errs = append(errs, ErrSubscriberPrefixRequired)
 	}
 
-	if len(viper.GetStringSlice("events.topics")) < 1 {
+	if len(viper.GetStringSlice("change-topics")) < 1 {
 		errs = append(errs, ErrSubscriberTopicsRequired)
 	}
 
