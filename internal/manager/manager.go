@@ -76,7 +76,7 @@ func (m *Manager) Run() error {
 
 	// use desired config on start
 	if err := m.updateConfigToLatest(); err != nil {
-		m.Logger.Errorw("failed to initialize the config", zap.Error(err))
+		m.Logger.Fatalw("failed to initialize the config", zap.Error(err))
 	}
 
 	// listen for event messages on subject(s)
@@ -107,29 +107,42 @@ func (m Manager) loadbalancerTargeted(msg *events.ChangeMessage) bool {
 func (m *Manager) ProcessMsg(msg *message.Message) error {
 	changeMsg, err := events.UnmarshalChangeMessage(msg.Payload)
 	if err != nil {
-		m.Logger.Errorw("failed to process data in msg", zap.Error(err))
+		m.Logger.Errorw("failed to process data in msg", zap.Error(err), "messageID", msg.UUID, "message", msg.Payload)
 		return err
 	}
 
 	switch events.ChangeType(changeMsg.EventType) {
 	case events.CreateChangeType:
 		fallthrough
+	case events.DeleteChangeType:
+		fallthrough
 	case events.UpdateChangeType:
 		// drop msg, if not targeted for this lb
 		if !m.loadbalancerTargeted(&changeMsg) {
-			m.Logger.Debugw("ignoring msg, not targeted for this lb", zap.String("loadbalancer-id", m.ManagedLBID))
 			return nil
 		}
 
+		m.Logger.Debugw("msg received",
+			zap.String("loadbalancerID", m.ManagedLBID),
+			zap.String("event-type", changeMsg.EventType),
+			zap.String("messageID", msg.UUID),
+			"message", msg.Payload)
+
 		if err := m.updateConfigToLatest(m.ManagedLBID); err != nil {
 			m.Logger.Errorw("failed to update haproxy config",
-				zap.String("loadbalancer.id", m.ManagedLBID),
-				zap.Error(err))
+				zap.String("loadbalancerID", m.ManagedLBID),
+				zap.String("event-type", changeMsg.EventType),
+				zap.Error(err),
+				zap.String("messageID", msg.UUID),
+				"message", msg.Payload)
 
 			return err
 		}
 	default:
-		m.Logger.Debugw("ignoring msg, not a create or update event", zap.String("event-type", changeMsg.EventType))
+		m.Logger.Debugw("ignoring msg, not a create/update/delete event",
+			zap.String("event-type", changeMsg.EventType),
+			zap.String("messageID", msg.UUID),
+			"message", msg.Payload)
 	}
 
 	return nil
@@ -141,12 +154,12 @@ func (m *Manager) updateConfigToLatest(lbID ...string) error {
 		return errLoadBalancerIDParamInvalid
 	}
 
-	m.Logger.Info("updating the config")
+	m.Logger.Infow("updating haproxy config", zap.String("loadbalancerID", m.ManagedLBID))
 
 	// load base config
 	cfg, err := parser.New(options.Path(m.BaseCfgPath), options.NoNamedDefaultsFrom)
 	if err != nil {
-		m.Logger.Fatalw("failed to load haproxy base config", "error", err)
+		m.Logger.Fatalw("failed to load haproxy base config", zap.Error(err))
 	}
 
 	if len(lbID) == 1 {
@@ -164,17 +177,17 @@ func (m *Manager) updateConfigToLatest(lbID ...string) error {
 	}
 
 	// check dataplaneapi to see if a valid config
-	if err = m.DataPlaneClient.CheckConfig(m.Context, cfg.String()); err != nil {
+	if err := m.DataPlaneClient.CheckConfig(m.Context, cfg.String()); err != nil {
 		return err
 	}
 
 	// post dataplaneapi
-	if err = m.DataPlaneClient.PostConfig(m.Context, cfg.String()); err != nil {
+	if err := m.DataPlaneClient.PostConfig(m.Context, cfg.String()); err != nil {
 		return err
 	}
 
-	m.Logger.Info("config successfully updated")
-	m.currentConfig = cfg.String() // primarily for testing
+	m.Logger.Infow("config successfully updated", zap.String("loadbalancerID", m.ManagedLBID))
+	m.currentConfig = cfg.String() // for testing
 
 	return nil
 }

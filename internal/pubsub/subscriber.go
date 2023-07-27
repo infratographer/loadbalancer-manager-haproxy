@@ -55,13 +55,13 @@ func NewSubscriber(ctx context.Context, cfg events.SubscriberConfig, opts ...Sub
 		opt(s)
 	}
 
-	s.logger.Debugw("subscriber configuration", cfg)
-
 	return s, nil
 }
 
 // Subscribe subscribes to a nats subject
 func (s *Subscriber) Subscribe(topic string) error {
+	s.logger.Debugw("Subscribing to topic", "topic", topic)
+
 	msgChan, err := s.subscriber.SubscribeChanges(s.ctx, topic)
 	if err != nil {
 		return err
@@ -98,7 +98,8 @@ func (s Subscriber) listen(messages <-chan *message.Message, wg *sync.WaitGroup)
 
 	for msg := range messages {
 		if err := s.msgHandler(msg); err != nil {
-			s.logger.Warn("Failed to process msg: ", err)
+			s.logger.Errorw("Failed to process msg: ", zap.Error(err))
+			msg.Nack()
 		} else {
 			msg.Ack()
 		}
