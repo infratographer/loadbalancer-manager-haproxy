@@ -75,12 +75,17 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 		cancel()
 	}()
 
+	managedLBID, err := gidx.Parse(viper.GetString("loadbalancer.id"))
+	if err != nil {
+		logger.Fatalw("failed to parse loadbalancer.id gidx: %w", err, "loadbalancerID", viper.GetString("loadbalancer.id"))
+	}
+
 	mgr := &manager.Manager{
 		Context:         ctx,
 		Logger:          logger,
 		DataPlaneClient: dataplaneapi.NewClient(viper.GetString("dataplane.url")),
 		LBClient:        lbapi.NewClient(viper.GetString("loadbalancerapi.url")),
-		ManagedLBID:     viper.GetString("loadbalancer.id"),
+		ManagedLBID:     managedLBID,
 		BaseCfgPath:     viper.GetString("haproxy.config.base"),
 	}
 
@@ -162,12 +167,6 @@ func validateMandatoryFlags() error {
 
 	if viper.GetString("loadbalancer.id") == "" {
 		errs = append(errs, ErrLBIDRequired)
-	} else {
-		// check if the loadbalancer id is a valid gidx
-		_, err := gidx.Parse(viper.GetString("loadbalancer.id"))
-		if err != nil {
-			errs = append(errs, ErrLBIDInvalid)
-		}
 	}
 
 	if len(errs) == 0 {

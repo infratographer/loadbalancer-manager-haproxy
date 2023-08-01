@@ -13,6 +13,7 @@ import (
 	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
 
 	"go.infratographer.com/x/events"
+	"go.infratographer.com/x/gidx"
 	"go.uber.org/zap"
 
 	"github.com/ThreeDotsLabs/watermill/message"
@@ -46,7 +47,7 @@ type Manager struct {
 	Subscriber      eventSubscriber
 	DataPlaneClient dataPlaneAPI
 	LBClient        lbAPI
-	ManagedLBID     string
+	ManagedLBID     gidx.PrefixedID
 	BaseCfgPath     string
 
 	// currentConfig for unit testing
@@ -90,11 +91,13 @@ func (m *Manager) Run() error {
 // loadbalancerTargeted returns true if this ChangeMessage is targeted to the
 // loadbalancerID the manager is configured to act on
 func (m Manager) loadbalancerTargeted(msg *events.ChangeMessage) bool {
-	if msg.SubjectID.String() == m.ManagedLBID {
+	m.Logger.Debugw("change msg received", "event-type", msg.EventType, "subjectID", msg.SubjectID, "additonalSubjects", msg.AdditionalSubjectIDs)
+
+	if msg.SubjectID == m.ManagedLBID {
 		return true
 	} else {
 		for _, subject := range msg.AdditionalSubjectIDs {
-			if subject.String() == m.ManagedLBID {
+			if subject == m.ManagedLBID {
 				return true
 			}
 		}
@@ -122,19 +125,23 @@ func (m *Manager) ProcessMsg(msg *message.Message) error {
 			return nil
 		}
 
-		m.Logger.Debugw("msg received",
-			zap.String("loadbalancerID", m.ManagedLBID),
+		m.Logger.Infow("msg received",
+			zap.String("loadbalancerID", m.ManagedLBID.String()),
 			zap.String("event-type", changeMsg.EventType),
 			zap.String("messageID", msg.UUID),
-			"message", msg.Payload)
+			zap.String("message", string(msg.Payload)),
+			zap.String("subjectID", changeMsg.SubjectID.String()),
+			"additionalSubjects", changeMsg.AdditionalSubjectIDs)
 
-		if err := m.updateConfigToLatest(m.ManagedLBID); err != nil {
+		if err := m.updateConfigToLatest(); err != nil {
 			m.Logger.Errorw("failed to update haproxy config",
-				zap.String("loadbalancerID", m.ManagedLBID),
+				zap.String("loadbalancerID", m.ManagedLBID.String()),
 				zap.String("event-type", changeMsg.EventType),
 				zap.Error(err),
 				zap.String("messageID", msg.UUID),
-				"message", msg.Payload)
+				zap.String("message", string(msg.Payload)),
+				zap.String("subjectID", changeMsg.SubjectID.String()),
+				"additionalSubjects", changeMsg.AdditionalSubjectIDs)
 
 			return err
 		}
@@ -149,12 +156,12 @@ func (m *Manager) ProcessMsg(msg *message.Message) error {
 }
 
 // updateConfigToLatest update the haproxy cfg to either baseline or one requested from lbapi with optional lbID param
-func (m *Manager) updateConfigToLatest(lbID ...string) error {
-	if len(lbID) > 1 {
+func (m *Manager) updateConfigToLatest() error {
+	m.Logger.Infow("updating haproxy config", zap.String("loadbalancerID", m.ManagedLBID.String()))
+
+	if m.ManagedLBID == "" {
 		return errLoadBalancerIDParamInvalid
 	}
-
-	m.Logger.Infow("updating haproxy config", zap.String("loadbalancerID", m.ManagedLBID))
 
 	// load base config
 	cfg, err := parser.New(options.Path(m.BaseCfgPath), options.NoNamedDefaultsFrom)
@@ -162,18 +169,16 @@ func (m *Manager) updateConfigToLatest(lbID ...string) error {
 		m.Logger.Fatalw("failed to load haproxy base config", zap.Error(err))
 	}
 
-	if len(lbID) == 1 {
-		// get desired state from lbapi
-		lb, err := m.LBClient.GetLoadBalancer(m.Context, m.ManagedLBID)
-		if err != nil {
-			return err
-		}
+	// get desired state from lbapi
+	lb, err := m.LBClient.GetLoadBalancer(m.Context, m.ManagedLBID.String())
+	if err != nil {
+		return err
+	}
 
-		// merge response
-		cfg, err = mergeConfig(cfg, lb)
-		if err != nil {
-			return err
-		}
+	// merge response
+	cfg, err = mergeConfig(cfg, lb)
+	if err != nil {
+		return err
 	}
 
 	// check dataplaneapi to see if a valid config
@@ -186,7 +191,7 @@ func (m *Manager) updateConfigToLatest(lbID ...string) error {
 		return err
 	}
 
-	m.Logger.Infow("config successfully updated", zap.String("loadbalancerID", m.ManagedLBID))
+	m.Logger.Infow("config successfully updated", zap.String("loadbalancerID", m.ManagedLBID.String()))
 	m.currentConfig = cfg.String() // for testing
 
 	return nil

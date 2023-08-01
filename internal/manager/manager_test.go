@@ -84,9 +84,10 @@ func TestUpdateConfigToLatest(t *testing.T) {
 			Logger:      logger,
 			LBClient:    mockLBAPI,
 			BaseCfgPath: testBaseCfgPath,
+			ManagedLBID: gidx.PrefixedID("loadbal-testing"),
 		}
 
-		err := mgr.updateConfigToLatest("loadbal-test")
+		err := mgr.updateConfigToLatest()
 		assert.NotNil(t, err)
 	})
 
@@ -113,8 +114,29 @@ func TestUpdateConfigToLatest(t *testing.T) {
 		require.Error(t, err)
 	})
 
+	t.Run("errors when manager loadbalancerID is empty", func(t *testing.T) {
+		mgr := Manager{
+			Logger:      logger,
+			BaseCfgPath: testBaseCfgPath,
+		}
+
+		err := mgr.updateConfigToLatest()
+		require.ErrorIs(t, err, errLoadBalancerIDParamInvalid)
+	})
+
 	t.Run("successfully sets initial base config", func(t *testing.T) {
 		t.Parallel()
+
+		mockLBAPI := &mock.LBAPIClient{
+			DoGetLoadBalancer: func(ctx context.Context, id string) (*lbapi.GetLoadBalancer, error) {
+				return &lbapi.GetLoadBalancer{
+					LoadBalancer: lbapi.LoadBalancer{
+						ID:    "loadbal-test",
+						Ports: lbapi.Ports{},
+					},
+				}, nil
+			},
+		}
 
 		mockDataplaneAPI := &mock.DataplaneAPIClient{
 			DoPostConfig: func(ctx context.Context, config string) error {
@@ -128,7 +150,9 @@ func TestUpdateConfigToLatest(t *testing.T) {
 		mgr := Manager{
 			Logger:          logger,
 			DataPlaneClient: mockDataplaneAPI,
+			LBClient:        mockLBAPI,
 			BaseCfgPath:     testBaseCfgPath,
+			ManagedLBID:     gidx.PrefixedID("loadbal-test"),
 		}
 
 		err := mgr.updateConfigToLatest()
@@ -220,9 +244,10 @@ func TestUpdateConfigToLatest(t *testing.T) {
 			LBClient:        mockLBAPI,
 			DataPlaneClient: mockDataplaneAPI,
 			BaseCfgPath:     testBaseCfgPath,
+			ManagedLBID:     gidx.PrefixedID("loadbal-test"),
 		}
 
-		err := mgr.updateConfigToLatest("loadbal-test")
+		err := mgr.updateConfigToLatest()
 		require.Nil(t, err)
 
 		expCfg, err := os.ReadFile(fmt.Sprintf("%s/%s", testDataBaseDir, "lb-ex-1-exp.cfg"))
@@ -233,33 +258,43 @@ func TestUpdateConfigToLatest(t *testing.T) {
 }
 
 func TestLoadBalancerTargeted(t *testing.T) {
+	l, _ := zap.NewDevelopmentConfig().Build()
+	logger := l.Sugar()
+
 	testcases := []struct {
 		name             string
-		pubsubMsg        events.ChangeMessage
+		pubsubMsg        *events.ChangeMessage
 		msgTargetedForLB bool
 	}{
 		{
 			name: "subjectID targeted for loadbalancer",
-			pubsubMsg: events.ChangeMessage{SubjectID: "loadbal-test",
-				AdditionalSubjectIDs: []gidx.PrefixedID{"loadpol-test"}},
+			pubsubMsg: &events.ChangeMessage{
+				SubjectID:            gidx.PrefixedID("loadbal-testing"),
+				AdditionalSubjectIDs: []gidx.PrefixedID{"loadpol-testing"},
+			},
 			msgTargetedForLB: true,
 		},
 		{
 			name: "AdditionalSubjectID is targeted for loadbalancer",
-			pubsubMsg: events.ChangeMessage{SubjectID: "loadprt-test",
-				AdditionalSubjectIDs: []gidx.PrefixedID{"loadbal-test"}},
+			pubsubMsg: &events.ChangeMessage{
+				SubjectID:            gidx.PrefixedID("loadprt-testing"),
+				AdditionalSubjectIDs: []gidx.PrefixedID{"loadbal-testing"},
+			},
 			msgTargetedForLB: true,
 		},
 		{
 			name: "msg is not targeted for loadbalancer",
-			pubsubMsg: events.ChangeMessage{SubjectID: "loadprt-notme",
-				AdditionalSubjectIDs: []gidx.PrefixedID{"loadbal-notme"}},
+			pubsubMsg: &events.ChangeMessage{
+				SubjectID:            gidx.PrefixedID("loadprt-nottargeted"),
+				AdditionalSubjectIDs: []gidx.PrefixedID{"loadbal-nottargeted"},
+			},
 			msgTargetedForLB: false,
 		},
 	}
 
 	mgr := Manager{
-		ManagedLBID: "loadbal-test",
+		ManagedLBID: gidx.PrefixedID("loadbal-testing"),
+		Logger:      logger,
 	}
 
 	for _, tt := range testcases {
@@ -269,7 +304,7 @@ func TestLoadBalancerTargeted(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			targeted := mgr.loadbalancerTargeted(&tt.pubsubMsg)
+			targeted := mgr.loadbalancerTargeted(tt.pubsubMsg)
 			assert.Equal(t, tt.msgTargetedForLB, targeted)
 		})
 	}
@@ -283,7 +318,7 @@ func TestProcessMsg(t *testing.T) {
 
 	mgr := Manager{
 		Logger:      logger,
-		ManagedLBID: "loadbal-managedbythisprocess",
+		ManagedLBID: gidx.PrefixedID("loadbal-managedbythisprocess"),
 	}
 
 	ProcessMsgTests := []struct {
@@ -302,7 +337,7 @@ func TestProcessMsg(t *testing.T) {
 		},
 		{
 			name:      "ignores messages not targeted for this lb",
-			pubsubMsg: events.ChangeMessage{SubjectID: "loadbal-test", EventType: string(events.CreateChangeType)},
+			pubsubMsg: events.ChangeMessage{SubjectID: gidx.PrefixedID("loadbal-test"), EventType: string(events.CreateChangeType)},
 		},
 	}
 
@@ -357,11 +392,11 @@ func TestProcessMsg(t *testing.T) {
 			Logger:          logger,
 			DataPlaneClient: mockDataplaneAPI,
 			LBClient:        mockLBAPI,
-			ManagedLBID:     "loadbal-managedbythisprocess",
+			ManagedLBID:     gidx.PrefixedID("loadbal-managedbythisprocess"),
 		}
 
 		data, _ := json.Marshal(events.ChangeMessage{
-			SubjectID: "loadbal-managedbythisprocess",
+			SubjectID: gidx.PrefixedID("loadbal-managedbythisprocess"),
 			EventType: string(events.CreateChangeType),
 		})
 
@@ -457,7 +492,7 @@ func TestEventsIntegration(t *testing.T) {
 			Logger:          logger,
 			DataPlaneClient: mockDataplaneAPI,
 			LBClient:        mockLBAPI,
-			ManagedLBID:     "loadbal-managedbythisprocess",
+			ManagedLBID:     gidx.PrefixedID("loadbal-managedbythisprocess"),
 		}
 
 		// setup timeout context to break free from pubsub Listen()
@@ -482,7 +517,7 @@ func TestEventsIntegration(t *testing.T) {
 			context.Background(),
 			"loadbalancer",
 			events.ChangeMessage{
-				SubjectID: "loadbal-managedbythisprocess",
+				SubjectID: gidx.PrefixedID("loadbal-managedbythisprocess"),
 				EventType: string(events.CreateChangeType),
 			})
 		require.NoError(t, err)
