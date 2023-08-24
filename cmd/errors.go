@@ -3,12 +3,6 @@ package cmd
 import "errors"
 
 var (
-	// ErrSubscriberURLRequired is returned when a event subscriber url is missing
-	ErrSubscriberURLRequired = errors.New("nats url is required and cannot be empty")
-
-	// ErrSubscriberPrefixRequired is returned when a NATS subject prefix is missing
-	ErrSubscriberPrefixRequired = errors.New("env LOADBALANCER_MANAGER_HAPROXY_EVENTS_SUBSCRIBER_PREFIX is required and cannot be empty")
-
 	ErrSubscriberTopicsRequired = errors.New("change-topics is required and cannot be empty")
 
 	// ErrNATSAuthRequired is returned when a NATS auth method is missing

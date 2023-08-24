@@ -145,14 +145,6 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 func validateMandatoryFlags() error {
 	errs := []error{}
 
-	if viper.GetString("events.subscriber.url") == "" {
-		errs = append(errs, ErrSubscriberURLRequired)
-	}
-
-	if viper.GetString("events.subscriber.prefix") == "" {
-		errs = append(errs, ErrSubscriberPrefixRequired)
-	}
-
 	if len(viper.GetStringSlice("change-topics")) < 1 {
 		errs = append(errs, ErrSubscriberTopicsRequired)
 	}
