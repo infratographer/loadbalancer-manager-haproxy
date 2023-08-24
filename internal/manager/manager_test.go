@@ -2,7 +2,6 @@ package manager
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -10,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ThreeDotsLabs/watermill/message"
 	parser "github.com/haproxytech/config-parser/v4"
 	"github.com/haproxytech/config-parser/v4/options"
 	"github.com/stretchr/testify/assert"
@@ -263,12 +261,12 @@ func TestLoadBalancerTargeted(t *testing.T) {
 
 	testcases := []struct {
 		name             string
-		pubsubMsg        *events.ChangeMessage
+		pubsubMsg        events.ChangeMessage
 		msgTargetedForLB bool
 	}{
 		{
 			name: "subjectID targeted for loadbalancer",
-			pubsubMsg: &events.ChangeMessage{
+			pubsubMsg: events.ChangeMessage{
 				SubjectID:            gidx.PrefixedID("loadbal-testing"),
 				AdditionalSubjectIDs: []gidx.PrefixedID{"loadpol-testing"},
 			},
@@ -276,7 +274,7 @@ func TestLoadBalancerTargeted(t *testing.T) {
 		},
 		{
 			name: "AdditionalSubjectID is targeted for loadbalancer",
-			pubsubMsg: &events.ChangeMessage{
+			pubsubMsg: events.ChangeMessage{
 				SubjectID:            gidx.PrefixedID("loadprt-testing"),
 				AdditionalSubjectIDs: []gidx.PrefixedID{"loadbal-testing"},
 			},
@@ -284,7 +282,7 @@ func TestLoadBalancerTargeted(t *testing.T) {
 		},
 		{
 			name: "msg is not targeted for loadbalancer",
-			pubsubMsg: &events.ChangeMessage{
+			pubsubMsg: events.ChangeMessage{
 				SubjectID:            gidx.PrefixedID("loadprt-nottargeted"),
 				AdditionalSubjectIDs: []gidx.PrefixedID{"loadbal-nottargeted"},
 			},
@@ -319,18 +317,14 @@ func TestProcessMsg(t *testing.T) {
 	mgr := Manager{
 		Logger:      logger,
 		ManagedLBID: gidx.PrefixedID("loadbal-managedbythisprocess"),
+		Context:     context.Background(),
 	}
 
 	ProcessMsgTests := []struct {
 		name      string
-		pubsubMsg interface{}
+		pubsubMsg events.ChangeMessage
 		errMsg    string
 	}{
-		{
-			name:      "failure to unmarshal msg",
-			pubsubMsg: "not a valid msg",
-			errMsg:    "cannot unmarshal",
-		},
 		{
 			name:      "ignores messages with subject prefix not supported",
 			pubsubMsg: events.ChangeMessage{SubjectID: "invalid-", EventType: string(events.CreateChangeType)},
@@ -345,16 +339,11 @@ func TestProcessMsg(t *testing.T) {
 		// go vet
 		tt := tt
 
-		data, _ := json.Marshal(tt.pubsubMsg)
-
-		eventMsg := &message.Message{
-			Payload: data,
-		}
-
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			err := mgr.ProcessMsg(eventMsg)
+			msg := CreateTestMessage(t, &mgr, tt.pubsubMsg)
+			err := mgr.ProcessMsg(msg)
 
 			if tt.errMsg != "" {
 				require.Error(t, err)
@@ -388,23 +377,20 @@ func TestProcessMsg(t *testing.T) {
 			},
 		}
 
-		mgr := Manager{
+		mgr := &Manager{
+			Context:         context.Background(),
 			Logger:          logger,
 			DataPlaneClient: mockDataplaneAPI,
 			LBClient:        mockLBAPI,
 			ManagedLBID:     gidx.PrefixedID("loadbal-managedbythisprocess"),
 		}
 
-		data, _ := json.Marshal(events.ChangeMessage{
+		msg := CreateTestMessage(t, mgr, events.ChangeMessage{
 			SubjectID: gidx.PrefixedID("loadbal-managedbythisprocess"),
 			EventType: string(events.CreateChangeType),
 		})
 
-		eventMsg := &message.Message{
-			Payload: data,
-		}
-
-		err = mgr.ProcessMsg(eventMsg)
+		err = mgr.ProcessMsg(msg)
 		require.Nil(t, err)
 	})
 }
@@ -415,9 +401,6 @@ func TestEventsIntegration(t *testing.T) {
 
 	t.Run("events integration", func(t *testing.T) {
 		t.Parallel()
-
-		natsSrv, err := eventtools.NewNatsServer()
-		require.NoError(t, err)
 
 		mockDataplaneAPI := &mock.DataplaneAPIClient{
 			DoCheckConfig: func(ctx context.Context, config string) error {
@@ -487,7 +470,7 @@ func TestEventsIntegration(t *testing.T) {
 			},
 		}
 
-		mgr := Manager{
+		mgr := &Manager{
 			BaseCfgPath:     "../../.devcontainer/config/haproxy.cfg",
 			Logger:          logger,
 			DataPlaneClient: mockDataplaneAPI,
@@ -499,30 +482,14 @@ func TestEventsIntegration(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.TODO(), time.Duration(1*time.Second))
 		defer cancel()
 
-		// subscribe
-		subscriber, err := pubsub.NewSubscriber(ctx, natsSrv.SubscriberConfig, pubsub.WithMsgHandler(mgr.ProcessMsg))
-		require.NoError(t, err)
-		require.NotNil(t, subscriber)
+		mgr.Context = ctx
 
-		mgr.Subscriber = subscriber
+		_ = CreateTestMessage(t, mgr, events.ChangeMessage{
+			SubjectID: gidx.PrefixedID("loadbal-managedbythisprocess"),
+			EventType: string(events.CreateChangeType),
+		})
 
-		err = mgr.Subscriber.Subscribe("create.loadbalancer")
-		require.NoError(t, err)
-
-		// publish
-		publisher, err := events.NewPublisher(natsSrv.PublisherConfig)
-		require.NoError(t, err)
-
-		err = publisher.PublishChange(
-			context.Background(),
-			"loadbalancer",
-			events.ChangeMessage{
-				SubjectID: gidx.PrefixedID("loadbal-managedbythisprocess"),
-				EventType: string(events.CreateChangeType),
-			})
-		require.NoError(t, err)
-
-		err = mgr.Subscriber.Listen()
+		err := mgr.Subscriber.Listen()
 		require.Nil(t, err)
 
 		// check currentConfig (testing helper variable)
@@ -533,6 +500,36 @@ func TestEventsIntegration(t *testing.T) {
 
 		assert.Equal(t, strings.TrimSpace(string(expCfg)), strings.TrimSpace(mgr.currentConfig))
 	})
+}
+
+func CreateTestMessage(t *testing.T, mgr *Manager, changeMsg events.ChangeMessage) events.Message[events.ChangeMessage] {
+	// testnats server connection
+	natsSrv, err := eventtools.NewNatsServer()
+	require.NoError(t, err)
+
+	eventHandler, err := events.NewNATSConnection(natsSrv.Config.NATS)
+	require.NoError(t, err)
+
+	// subscribe
+	subscriber := pubsub.NewSubscriber(mgr.Context, eventHandler, pubsub.WithMsgHandler(mgr.ProcessMsg))
+	require.NotNil(t, subscriber)
+
+	mgr.Subscriber = subscriber
+
+	err = mgr.Subscriber.Subscribe("create.loadbalancer")
+	require.NoError(t, err)
+
+	// publish
+	eventsConn, err := events.NewConnection(natsSrv.Config)
+	require.NoError(t, err)
+
+	testMsg, err := eventsConn.PublishChange(
+		mgr.Context,
+		"loadbalancer",
+		changeMsg)
+	require.NoError(t, err)
+
+	return testMsg
 }
 
 var mergeTestData1 = lbapi.GetLoadBalancer{

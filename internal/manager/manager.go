@@ -15,8 +15,6 @@ import (
 	"go.infratographer.com/x/events"
 	"go.infratographer.com/x/gidx"
 	"go.uber.org/zap"
-
-	"github.com/ThreeDotsLabs/watermill/message"
 )
 
 var (
@@ -90,8 +88,11 @@ func (m *Manager) Run() error {
 
 // loadbalancerTargeted returns true if this ChangeMessage is targeted to the
 // loadbalancerID the manager is configured to act on
-func (m Manager) loadbalancerTargeted(msg *events.ChangeMessage) bool {
-	m.Logger.Debugw("change msg received", "event-type", msg.EventType, "subjectID", msg.SubjectID, "additonalSubjects", msg.AdditionalSubjectIDs)
+func (m Manager) loadbalancerTargeted(msg events.ChangeMessage) bool {
+	m.Logger.Debugw("change msg received",
+		"event-type", msg.EventType,
+		"subjectID", msg.SubjectID,
+		"additonalSubjects", msg.AdditionalSubjectIDs)
 
 	if msg.SubjectID == m.ManagedLBID {
 		return true
@@ -107,12 +108,17 @@ func (m Manager) loadbalancerTargeted(msg *events.ChangeMessage) bool {
 }
 
 // ProcessMsg message handler
-func (m *Manager) ProcessMsg(msg *message.Message) error {
-	changeMsg, err := events.UnmarshalChangeMessage(msg.Payload)
-	if err != nil {
-		m.Logger.Errorw("failed to process data in msg", zap.Error(err), "messageID", msg.UUID, "message", msg.Payload)
-		return err
-	}
+func (m *Manager) ProcessMsg(msg events.Message[events.ChangeMessage]) error {
+	changeMsg := msg.Message()
+
+	mlogger := m.Logger.With(
+		"event.message.id", msg.ID(),
+		"event.message.topic", msg.Topic(),
+		"event.message.source", msg.Source(),
+		zap.String("loadbalancerID", m.ManagedLBID.String()),
+		zap.String("event-type", msg.Message().EventType),
+		zap.String("subjectID", changeMsg.SubjectID.String()),
+		"additionalSubjects", changeMsg.AdditionalSubjectIDs)
 
 	switch events.ChangeType(changeMsg.EventType) {
 	case events.CreateChangeType:
@@ -121,35 +127,20 @@ func (m *Manager) ProcessMsg(msg *message.Message) error {
 		fallthrough
 	case events.UpdateChangeType:
 		// drop msg, if not targeted for this lb
-		if !m.loadbalancerTargeted(&changeMsg) {
+		if !m.loadbalancerTargeted(changeMsg) {
 			return nil
 		}
 
-		m.Logger.Infow("msg received",
-			zap.String("loadbalancerID", m.ManagedLBID.String()),
-			zap.String("event-type", changeMsg.EventType),
-			zap.String("messageID", msg.UUID),
-			zap.String("message", string(msg.Payload)),
-			zap.String("subjectID", changeMsg.SubjectID.String()),
-			"additionalSubjects", changeMsg.AdditionalSubjectIDs)
+		mlogger.Infow("msg received")
 
 		if err := m.updateConfigToLatest(); err != nil {
-			m.Logger.Errorw("failed to update haproxy config",
-				zap.String("loadbalancerID", m.ManagedLBID.String()),
-				zap.String("event-type", changeMsg.EventType),
-				zap.Error(err),
-				zap.String("messageID", msg.UUID),
-				zap.String("message", string(msg.Payload)),
-				zap.String("subjectID", changeMsg.SubjectID.String()),
-				"additionalSubjects", changeMsg.AdditionalSubjectIDs)
-
+			mlogger.Errorw("failed to update haproxy config")
 			return err
 		}
 	default:
 		m.Logger.Debugw("ignoring msg, not a create/update/delete event",
 			zap.String("event-type", changeMsg.EventType),
-			zap.String("messageID", msg.UUID),
-			"message", msg.Payload)
+			zap.String("messageID", msg.ID()))
 	}
 
 	return nil

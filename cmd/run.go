@@ -56,7 +56,7 @@ func init() {
 	runCmd.PersistentFlags().String("loadbalancer-id", "", "Loadbalancer ID to act on event changes")
 	viperx.MustBindFlag(viper.GetViper(), "loadbalancer.id", runCmd.PersistentFlags().Lookup("loadbalancer-id"))
 
-	events.MustViperFlagsForSubscriber(viper.GetViper(), runCmd.PersistentFlags())
+	events.MustViperFlags(viper.GetViper(), runCmd.PersistentFlags(), appName)
 	oauth2x.MustViperFlags(viper.GetViper(), runCmd.Flags())
 }
 
@@ -106,31 +106,31 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 		mgr.LBClient = lbapi.NewClient(viper.GetString("loadbalancerapi.url"))
 	}
 
+	events, err := events.NewConnection(config.AppConfig.Events, events.WithLogger(logger))
+	if err != nil {
+		logger.Fatalw("failed to create events connection", "error", err)
+	}
+
 	// init events subscriber
-	subscriber, err := pubsub.NewSubscriber(
+	subscriber := pubsub.NewSubscriber(
 		ctx,
-		config.AppConfig.Events.Subscriber,
+		events,
 		pubsub.WithMsgHandler(mgr.ProcessMsg),
 		pubsub.WithLogger(logger),
 	)
-
-	if err != nil {
-		logger.Errorw("failed to create subscriber", zap.Error(err))
-		return err
-	}
 
 	mgr.Subscriber = subscriber
 
 	for _, topic := range viper.GetStringSlice("change-topics") {
 		if err := mgr.Subscriber.Subscribe(topic); err != nil {
-			logger.Errorw("failed to subscribe to changes topic", zap.String("topic", topic), zap.Error(err))
+			logger.Errorw("failed to subscribe to change topic", zap.String("topic", topic), zap.Error(err))
 			return err
 		}
 	}
 
 	defer func() {
 		if err := mgr.Subscriber.Close(); err != nil {
-			mgr.Logger.Errorw("failed to shutdown events subscriber", zap.Error(err))
+			mgr.Logger.Errorw("failed to shutdown events", zap.Error(err))
 		}
 	}()
 
