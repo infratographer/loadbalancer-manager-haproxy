@@ -42,6 +42,7 @@ github.com/MicahParks/keyfunc/v2 v2.0.3 h1:uKUEOc+knRO0UoucONisgNPiT85V2s/W5c0FQ
 github.com/MicahParks/keyfunc/v2 v2.0.3/go.mod h1:rW42fi+xgLJ2FRRXAfNx9ZA8WpD4OeE/yHVMteCkw9k=
 github.com/ThreeDotsLabs/watermill v1.3.2 h1:uU0F+sDmjHh6aYr0xo4gBZy8Tq77DM5F2cvJU46CO6I=
 github.com/ThreeDotsLabs/watermill v1.3.2/go.mod h1:zn/7F0TGOr1K/RX7bFbVxii6p1abOMLllAMpVpKinQg=
+github.com/ThreeDotsLabs/watermill v1.3.3/go.mod h1:FUH1a4BEmr5UCmCtg7CIYvEL11mdeVBDp1404+eLP+c=
 github.com/benbjohnson/clock v1.1.0 h1:Q92kusRqC1XV2MjkWETPvjJVqKetz1OzxZB7mHJLju8=
 github.com/brianvoe/gofakeit/v6 v6.23.0 h1:pgVhyWpYq4e0GEVCh2gdZnS/nBX+8SnyTBliHg5xjks=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
