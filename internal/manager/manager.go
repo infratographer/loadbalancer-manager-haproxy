@@ -35,7 +35,6 @@ type dataPlaneAPI interface {
 type eventSubscriber interface {
 	Listen() error
 	Subscribe(topic string) error
-	Close() error
 }
 
 // Manager contains configuration and client connections
@@ -116,7 +115,7 @@ func (m *Manager) ProcessMsg(msg events.Message[events.ChangeMessage]) error {
 		"event.message.topic", msg.Topic(),
 		"event.message.source", msg.Source(),
 		zap.String("loadbalancerID", m.ManagedLBID.String()),
-		zap.String("event-type", msg.Message().EventType),
+		zap.String("event-type", changeMsg.EventType),
 		zap.String("subjectID", changeMsg.SubjectID.String()),
 		"additionalSubjects", changeMsg.AdditionalSubjectIDs)
 

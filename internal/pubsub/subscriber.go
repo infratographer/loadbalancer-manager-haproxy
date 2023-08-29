@@ -20,8 +20,7 @@ type Subscriber struct {
 	changeChannels        []<-chan events.Message[events.ChangeMessage]
 	msgHandler            MsgHandler
 	logger                *zap.SugaredLogger
-	eventsConnection      events.Connection
-	subscriber            events.Subscriber
+	connection            events.Connection
 	maxProcessMsgAttempts uint64
 }
 
@@ -50,11 +49,11 @@ func WithMaxMsgProcessAttempts(max uint64) SubscriberOption {
 }
 
 // NewSubscriber creates a new Subscriber
-func NewSubscriber(ctx context.Context, subscriber events.Subscriber, opts ...SubscriberOption) *Subscriber {
+func NewSubscriber(ctx context.Context, connection events.Connection, opts ...SubscriberOption) *Subscriber {
 	s := &Subscriber{
 		ctx:        ctx,
 		logger:     zap.NewNop().Sugar(),
-		subscriber: subscriber,
+		connection: connection,
 	}
 
 	for _, opt := range opts {
@@ -68,7 +67,7 @@ func NewSubscriber(ctx context.Context, subscriber events.Subscriber, opts ...Su
 func (s *Subscriber) Subscribe(topic string) error {
 	s.logger.Debugw("Subscribing to topic", "topic", topic)
 
-	msgChan, err := s.subscriber.SubscribeChanges(s.ctx, topic)
+	msgChan, err := s.connection.SubscribeChanges(s.ctx, topic)
 	if err != nil {
 		return err
 	}
@@ -79,7 +78,7 @@ func (s *Subscriber) Subscribe(topic string) error {
 }
 
 // Listen start listening for messages on registered subjects and calls the registered message handler
-func (s Subscriber) Listen() error {
+func (s *Subscriber) Listen() error {
 	wg := &sync.WaitGroup{}
 
 	if s.msgHandler == nil {
@@ -99,7 +98,7 @@ func (s Subscriber) Listen() error {
 }
 
 // listen listens for messages on a channel and calls the registered message handler
-func (s Subscriber) listen(messages <-chan events.Message[events.ChangeMessage], wg *sync.WaitGroup) {
+func (s *Subscriber) listen(messages <-chan events.Message[events.ChangeMessage], wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for msg := range messages {
@@ -125,9 +124,4 @@ func (s Subscriber) listen(messages <-chan events.Message[events.ChangeMessage],
 			slogger.Warnw("error occurred while acking", "error", ackErr)
 		}
 	}
-}
-
-// Close shuts down the events connection
-func (s *Subscriber) Close() error {
-	return s.eventsConnection.Shutdown(s.ctx)
 }

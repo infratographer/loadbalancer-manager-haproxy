@@ -529,6 +529,12 @@ func CreateTestMessage(t *testing.T, mgr *Manager, changeMsg events.ChangeMessag
 		changeMsg)
 	require.NoError(t, err)
 
+	defer func() {
+		natsSrv.Close()
+
+		_ = eventsConn.Shutdown(context.Background())
+	}()
+
 	return testMsg
 }
 
