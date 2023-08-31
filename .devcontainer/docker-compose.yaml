@@ -24,7 +24,7 @@ services:
     network_mode: service:dev
 
   nats-auth:
-    image: natsio/nats-box:0.13.8
+    image: natsio/nats-box:0.13.9
     command:
       - /tmp/configure-nats
     volumes:
