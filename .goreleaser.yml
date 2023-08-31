@@ -1,5 +1,103 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema-pro.json
 
-includes:
-  - from_url:
-      url: https://raw.githubusercontent.com/infratographer/release/main/goreleaser/base.yml
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: go
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    ldflags:
+      - -s -w
+      - -X go.infratographer.com/x/versionx.appName={{.ProjectName}}
+      - -X go.infratographer.com/x/versionx.version={{.Version}}
+      - -X go.infratographer.com/x/versionx.commit={{.Commit}}
+      - -X go.infratographer.com/x/versionx.date={{.Date}}
+      - -X go.infratographer.com/x/versionx.builtBy=infratographer-release-bot
+
+archives:
+  - format: binary
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ .Tag }}-next"
+
+changelog:
+  skip: false
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+
+  groups:
+    - title: "🎄 Features"
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: '🐞 Bug fixes'
+      regexp: '^.*?bug(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: "🚀 Others"
+      order: 999
+
+dockers:
+  -
+    image_templates:
+      - ghcr.io/infratographer/{{.ProjectName}}:{{ or (and (or .IsNightly .IsSnapshot) .Version) (printf "v%s" .Version) }}-amd64
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    build_flag_templates:
+      - --pull
+      - --platform=linux/amd64
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.description={{ .ProjectName }}
+      - --label=org.opencontainers.image.url=https://infratographer.com
+      - --label=org.opencontainers.image.source=https://github.com/infratographer/{{.ProjectName}}
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.created={{ time "2006-01-02T15:04:05Z07:00" }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+      - --label=org.opencontainers.image.licenses=Apache-2.0
+  -
+    image_templates:
+      - ghcr.io/infratographer/{{.ProjectName}}:{{ or (and (or .IsNightly .IsSnapshot) .Version) (printf "v%s" .Version) }}-arm64
+    dockerfile: Dockerfile.goreleaser
+    use: buildx
+    goarch: arm64
+    build_flag_templates:
+      - --pull
+      - --platform=linux/arm64
+      - --label=org.opencontainers.image.title={{ .ProjectName }}
+      - --label=org.opencontainers.image.description={{ .ProjectName }}
+      - --label=org.opencontainers.image.url=https://infratographer.com
+      - --label=org.opencontainers.image.source=https://github.com/infratographer/{{.ProjectName}}
+      - --label=org.opencontainers.image.version={{ .Version }}
+      - --label=org.opencontainers.image.created={{ time "2006-01-02T15:04:05Z07:00" }}
+      - --label=org.opencontainers.image.revision={{ .FullCommit }}
+      - --label=org.opencontainers.image.licenses=Apache-2.0
+
+docker_manifests:
+- name_template: ghcr.io/infratographer/{{.ProjectName}}:{{ or (and (or .IsNightly .IsSnapshot) .Version) (printf "v%s" .Version) }}
+  image_templates:
+  - ghcr.io/infratographer/{{.ProjectName}}:{{ or (and (or .IsNightly .IsSnapshot) .Version) (printf "v%s" .Version) }}-amd64
+  - ghcr.io/infratographer/{{.ProjectName}}:{{ or (and (or .IsNightly .IsSnapshot) .Version) (printf "v%s" .Version) }}-arm64
+
+release:
+  mode: prepend
+  prerelease: auto
+  draft: false
+  name_template: 'Release {{ or (and (or .IsNightly .IsSnapshot) .Version) (printf "v%s" .Version) }}'
+  header: |
+    # What's Changed
+
+nightly:
+  name_template: main-latest
+  tag_name: main-latest
+  publish_release: false
+  keep_single_release: true
