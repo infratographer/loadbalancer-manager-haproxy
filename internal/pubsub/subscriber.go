@@ -78,7 +78,7 @@ func (s *Subscriber) Subscribe(topic string) error {
 }
 
 // Listen start listening for messages on registered subjects and calls the registered message handler
-func (s *Subscriber) Listen() error {
+func (s Subscriber) Listen() error {
 	wg := &sync.WaitGroup{}
 
 	if s.msgHandler == nil {
@@ -98,7 +98,7 @@ func (s *Subscriber) Listen() error {
 }
 
 // listen listens for messages on a channel and calls the registered message handler
-func (s *Subscriber) listen(messages <-chan events.Message[events.ChangeMessage], wg *sync.WaitGroup) {
+func (s Subscriber) listen(messages <-chan events.Message[events.ChangeMessage], wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for msg := range messages {

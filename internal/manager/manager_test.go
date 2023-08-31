@@ -314,11 +314,33 @@ func TestProcessMsg(t *testing.T) {
 
 	require.Nil(t, err)
 
+	// testnats server connection
+	natsSrv, err := eventtools.NewNatsServer()
+	require.NoError(t, err)
+
+	eventsConn, err := events.NewNATSConnection(natsSrv.Config.NATS)
+	require.NoError(t, err)
+
+	defer func() {
+		natsSrv.Close()
+
+		_ = eventsConn.Shutdown(context.Background())
+	}()
+
 	mgr := Manager{
 		Logger:      logger,
 		ManagedLBID: gidx.PrefixedID("loadbal-managedbythisprocess"),
 		Context:     context.Background(),
 	}
+
+	// subscribe
+	subscriber := pubsub.NewSubscriber(context.Background(), eventsConn, pubsub.WithMsgHandler(mgr.ProcessMsg))
+	require.NotNil(t, subscriber)
+
+	err = subscriber.Subscribe("*.loadbalancer")
+	require.NoError(t, err)
+
+	mgr.Subscriber = subscriber
 
 	ProcessMsgTests := []struct {
 		name      string
@@ -340,9 +362,7 @@ func TestProcessMsg(t *testing.T) {
 		tt := tt
 
 		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-
-			msg := CreateTestMessage(t, &mgr, tt.pubsubMsg)
+			msg := PublishTestMessage(t, context.Background(), eventsConn, tt.pubsubMsg)
 			err := mgr.ProcessMsg(msg)
 
 			if tt.errMsg != "" {
@@ -356,8 +376,6 @@ func TestProcessMsg(t *testing.T) {
 	}
 
 	t.Run("successfully process create msg", func(t *testing.T) {
-		t.Parallel()
-
 		mockDataplaneAPI := &mock.DataplaneAPIClient{
 			DoCheckConfig: func(ctx context.Context, config string) error {
 				return nil
@@ -385,7 +403,7 @@ func TestProcessMsg(t *testing.T) {
 			ManagedLBID:     gidx.PrefixedID("loadbal-managedbythisprocess"),
 		}
 
-		msg := CreateTestMessage(t, mgr, events.ChangeMessage{
+		msg := PublishTestMessage(t, mgr.Context, eventsConn, events.ChangeMessage{
 			SubjectID: gidx.PrefixedID("loadbal-managedbythisprocess"),
 			EventType: string(events.CreateChangeType),
 		})
@@ -399,8 +417,21 @@ func TestEventsIntegration(t *testing.T) {
 	l, _ := zap.NewDevelopmentConfig().Build()
 	logger := l.Sugar()
 
+	// testnats server connection
+	natsSrv, err := eventtools.NewNatsServer()
+	require.NoError(t, err)
+
+	eventsConn, err := events.NewNATSConnection(natsSrv.Config.NATS)
+	require.NoError(t, err)
+
+	defer func() {
+		natsSrv.Close()
+
+		_ = eventsConn.Shutdown(context.Background())
+	}()
+
 	t.Run("events integration", func(t *testing.T) {
-		t.Parallel()
+		ctx := context.Background()
 
 		mockDataplaneAPI := &mock.DataplaneAPIClient{
 			DoCheckConfig: func(ctx context.Context, config string) error {
@@ -476,21 +507,30 @@ func TestEventsIntegration(t *testing.T) {
 			DataPlaneClient: mockDataplaneAPI,
 			LBClient:        mockLBAPI,
 			ManagedLBID:     gidx.PrefixedID("loadbal-managedbythisprocess"),
+			Context:         ctx,
 		}
 
-		// setup timeout context to break free from pubsub Listen()
-		ctx, cancel := context.WithTimeout(context.TODO(), time.Duration(1*time.Second))
-		defer cancel()
+		// subscribe
+		subscriber := pubsub.NewSubscriber(ctx, eventsConn, pubsub.WithMsgHandler(mgr.ProcessMsg))
+		require.NotNil(t, subscriber)
 
-		mgr.Context = ctx
+		err = subscriber.Subscribe(">")
+		require.NoError(t, err)
 
-		_ = CreateTestMessage(t, mgr, events.ChangeMessage{
+		mgr.Subscriber = subscriber
+
+		go func() {
+			err := mgr.Subscriber.Listen()
+			require.Nil(t, err)
+		}()
+
+		_ = PublishTestMessage(t, ctx, eventsConn, events.ChangeMessage{
 			SubjectID: gidx.PrefixedID("loadbal-managedbythisprocess"),
 			EventType: string(events.CreateChangeType),
 		})
 
-		err := mgr.Subscriber.Listen()
-		require.Nil(t, err)
+		// wait for msg to be processed by manager
+		time.Sleep(1 * time.Second)
 
 		// check currentConfig (testing helper variable)
 		assert.NotEmpty(t, mgr.currentConfig)
@@ -502,38 +542,13 @@ func TestEventsIntegration(t *testing.T) {
 	})
 }
 
-func CreateTestMessage(t *testing.T, mgr *Manager, changeMsg events.ChangeMessage) events.Message[events.ChangeMessage] {
-	// testnats server connection
-	natsSrv, err := eventtools.NewNatsServer()
-	require.NoError(t, err)
-
-	eventHandler, err := events.NewNATSConnection(natsSrv.Config.NATS)
-	require.NoError(t, err)
-
-	// subscribe
-	subscriber := pubsub.NewSubscriber(mgr.Context, eventHandler, pubsub.WithMsgHandler(mgr.ProcessMsg))
-	require.NotNil(t, subscriber)
-
-	mgr.Subscriber = subscriber
-
-	err = mgr.Subscriber.Subscribe("create.loadbalancer")
-	require.NoError(t, err)
-
+func PublishTestMessage(t *testing.T, ctx context.Context, eventsConn events.Connection, changeMsg events.ChangeMessage) events.Message[events.ChangeMessage] {
 	// publish
-	eventsConn, err := events.NewConnection(natsSrv.Config)
-	require.NoError(t, err)
-
 	testMsg, err := eventsConn.PublishChange(
-		mgr.Context,
-		"loadbalancer",
+		ctx,
+		"create.loadbalancer",
 		changeMsg)
 	require.NoError(t, err)
-
-	defer func() {
-		natsSrv.Close()
-
-		_ = eventsConn.Shutdown(context.Background())
-	}()
 
 	return testMsg
 }
