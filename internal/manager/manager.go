@@ -9,7 +9,6 @@ import (
 	"github.com/haproxytech/config-parser/v4/options"
 	"github.com/haproxytech/config-parser/v4/types"
 
-	"go.infratographer.com/loadbalancer-manager-haproxy/internal/dataplaneapi"
 	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
 
 	"go.infratographer.com/x/events"
@@ -30,6 +29,7 @@ type dataPlaneAPI interface {
 	PostConfig(ctx context.Context, config string) error
 	CheckConfig(ctx context.Context, config string) error
 	APIIsReady(ctx context.Context) bool
+	WaitForDataPlaneReady(ctx context.Context, retries int, sleep time.Duration) error
 }
 
 type eventSubscriber interface {
@@ -68,7 +68,7 @@ func (m *Manager) Run() error {
 	}
 
 	// wait until the Data Plane API is running
-	if err := m.waitForDataPlaneReady(dataPlaneAPIRetryLimit, dataPlaneAPIRetrySleep); err != nil {
+	if err := m.DataPlaneClient.WaitForDataPlaneReady(m.Context, dataPlaneAPIRetryLimit, dataPlaneAPIRetrySleep); err != nil {
 		m.Logger.Fatal("unable to reach dataplaneapi. is it running?")
 	}
 
@@ -185,20 +185,6 @@ func (m *Manager) updateConfigToLatest() error {
 	m.currentConfig = cfg.String() // for testing
 
 	return nil
-}
-
-func (m Manager) waitForDataPlaneReady(retries int, sleep time.Duration) error {
-	for i := 0; i < retries; i++ {
-		if m.DataPlaneClient.APIIsReady(m.Context) {
-			m.Logger.Info("dataplaneapi is ready")
-			return nil
-		}
-
-		m.Logger.Info("waiting for dataplaneapi to become ready")
-		time.Sleep(sleep)
-	}
-
-	return dataplaneapi.ErrDataPlaneNotReady
 }
 
 // mergeConfig takes the response from lb api, merges with the base haproxy config and returns it

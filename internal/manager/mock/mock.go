@@ -2,6 +2,7 @@ package mock
 
 import (
 	"context"
+	"time"
 
 	"go.infratographer.com/loadbalancer-manager-haproxy/pkg/lbapi"
 )
@@ -17,9 +18,10 @@ func (c LBAPIClient) GetLoadBalancer(ctx context.Context, id string) (*lbapi.Get
 
 // DataplaneAPIClient mock client
 type DataplaneAPIClient struct {
-	DoPostConfig  func(ctx context.Context, config string) error
-	DoCheckConfig func(ctx context.Context, config string) error
-	DoAPIIsReady  func(ctx context.Context) bool
+	DoPostConfig            func(ctx context.Context, config string) error
+	DoCheckConfig           func(ctx context.Context, config string) error
+	DoAPIIsReady            func(ctx context.Context) bool
+	DoWaitForDataPlaneReady func(ctx context.Context, retries int, sleep time.Duration) error
 }
 
 func (c *DataplaneAPIClient) PostConfig(ctx context.Context, config string) error {
@@ -32,6 +34,10 @@ func (c DataplaneAPIClient) APIIsReady(ctx context.Context) bool {
 
 func (c DataplaneAPIClient) CheckConfig(ctx context.Context, config string) error {
 	return c.DoCheckConfig(ctx, config)
+}
+
+func (c DataplaneAPIClient) WaitForDataPlaneReady(ctx context.Context, retries int, sleep time.Duration) error {
+	return c.DoWaitForDataPlaneReady(ctx, retries, sleep)
 }
 
 // Subscriber mock client

@@ -89,7 +89,7 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 	mgr := &manager.Manager{
 		Context:         ctx,
 		Logger:          logger,
-		DataPlaneClient: dataplaneapi.NewClient(viper.GetString("dataplane.url")),
+		DataPlaneClient: dataplaneapi.NewClient(viper.GetString("dataplane.url"), dataplaneapi.WithLogger(logger)),
 		LBClient:        lbapi.NewClient(viper.GetString("loadbalancerapi.url")),
 		ManagedLBID:     managedLBID,
 		BaseCfgPath:     viper.GetString("haproxy.config.base"),

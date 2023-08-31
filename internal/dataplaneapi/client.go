@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+	"go.uber.org/zap"
 )
 
 var dataPlaneClientTimeout = 2 * time.Second
@@ -15,15 +16,33 @@ var dataPlaneClientTimeout = 2 * time.Second
 type Client struct {
 	client  *http.Client
 	baseURL string
+	logger  *zap.SugaredLogger
 }
 
+// Option configures a connection option.
+type Option func(c *Client)
+
 // NewClient returns an http client for Data Plane API
-func NewClient(url string) *Client {
-	return &Client{
+func NewClient(url string, options ...Option) *Client {
+	c := &Client{
 		client: &http.Client{
 			Timeout: dataPlaneClientTimeout,
 		},
 		baseURL: url,
+		logger:  zap.NewNop().Sugar(),
+	}
+
+	for _, opt := range options {
+		opt(c)
+	}
+
+	return c
+}
+
+// WithLogger sets the logger for the client
+func WithLogger(logger *zap.SugaredLogger) Option {
+	return func(c *Client) {
+		c.logger = logger
 	}
 }
 
@@ -101,4 +120,19 @@ func (c *Client) PostConfig(ctx context.Context, config string) error {
 	default:
 		return ErrDataPlaneHTTPError
 	}
+}
+
+// WaitForDataPlaneReady waits for the DataPlane API to be ready
+func (c Client) WaitForDataPlaneReady(ctx context.Context, retries int, sleep time.Duration) error {
+	for i := 0; i < retries; i++ {
+		if c.APIIsReady(ctx) {
+			c.logger.Info("dataplaneapi is ready")
+			return nil
+		}
+
+		c.logger.Info("waiting for dataplaneapi to become ready")
+		time.Sleep(sleep)
+	}
+
+	return ErrDataPlaneNotReady
 }
