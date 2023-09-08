@@ -8,7 +8,7 @@ require (
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.16.0
 	github.com/stretchr/testify v1.8.4
-	go.infratographer.com/load-balancer-api v0.0.26-0.20230907183148-881485c02423
+	go.infratographer.com/load-balancer-api v0.0.26-0.20230907230714-e947d177d31a
 	go.infratographer.com/x v0.3.8
 	go.uber.org/zap v1.25.0
 )

@@ -292,6 +292,8 @@ github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9de
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 go.infratographer.com/load-balancer-api v0.0.26-0.20230907183148-881485c02423 h1:8NOnc6TJ5YnW9N6VcEwFrR50oKDff/pxPjYTlNTl18Q=
 go.infratographer.com/load-balancer-api v0.0.26-0.20230907183148-881485c02423/go.mod h1:bg/+0/C+LJAKDsDpzm1IeeBTlC/MMO130z4Eh20nwhw=
+go.infratographer.com/load-balancer-api v0.0.26-0.20230907230714-e947d177d31a h1:juVg49s8NBu9arGCU71BKEXg3hGRzxnpU8JN+9HhK8Q=
+go.infratographer.com/load-balancer-api v0.0.26-0.20230907230714-e947d177d31a/go.mod h1:bg/+0/C+LJAKDsDpzm1IeeBTlC/MMO130z4Eh20nwhw=
 go.infratographer.com/x v0.3.8 h1:ZKL/oeTO8an4p58ZXtDdCMl9DVr7Y+RAY2EVeTf1/Uc=
 go.infratographer.com/x v0.3.8/go.mod h1:H8O2vkWmo26WNuQEFS2PlJoms9YLJ7BNiwFNMTwCuuA=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
