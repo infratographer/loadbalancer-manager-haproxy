@@ -16,11 +16,6 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	dataPlaneAPIRetryLimit = 10
-	dataPlaneAPIRetrySleep = 1 * time.Second
-)
-
 type lbAPI interface {
 	GetLoadBalancer(ctx context.Context, id string) (*lbapi.LoadBalancer, error)
 }
@@ -39,13 +34,15 @@ type eventSubscriber interface {
 
 // Manager contains configuration and client connections
 type Manager struct {
-	Context         context.Context
-	Logger          *zap.SugaredLogger
-	Subscriber      eventSubscriber
-	DataPlaneClient dataPlaneAPI
-	LBClient        lbAPI
-	ManagedLBID     gidx.PrefixedID
-	BaseCfgPath     string
+	Context                       context.Context
+	Logger                        *zap.SugaredLogger
+	Subscriber                    eventSubscriber
+	DataPlaneClient               dataPlaneAPI
+	DataPlaneConnectRetries       int
+	DataPlaneConnectRetryInterval time.Duration
+	LBClient                      lbAPI
+	ManagedLBID                   gidx.PrefixedID
+	BaseCfgPath                   string
 
 	// currentConfig for unit testing
 	currentConfig string
@@ -68,7 +65,7 @@ func (m *Manager) Run() error {
 	}
 
 	// wait until the Data Plane API is running
-	if err := m.DataPlaneClient.WaitForDataPlaneReady(m.Context, dataPlaneAPIRetryLimit, dataPlaneAPIRetrySleep); err != nil {
+	if err := m.DataPlaneClient.WaitForDataPlaneReady(m.Context, m.DataPlaneConnectRetries, m.DataPlaneConnectRetryInterval); err != nil {
 		m.Logger.Fatal("unable to reach dataplaneapi. is it running?")
 	}
 

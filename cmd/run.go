@@ -27,6 +27,11 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	defaultDataplaneConnRetries       = 30
+	defaultDataplaneConnRetryInterval = 1 * time.Second
+)
+
 // runCmd starts loadbalancer-manager-haproxy service
 var runCmd = &cobra.Command{
 	Use:   "run",
@@ -50,6 +55,12 @@ func init() {
 
 	runCmd.PersistentFlags().String("dataplane-url", "http://127.0.0.1:5555/v2/", "DataplaneAPI base url")
 	viperx.MustBindFlag(viper.GetViper(), "dataplane.url", runCmd.PersistentFlags().Lookup("dataplane-url"))
+
+	runCmd.PersistentFlags().Int("dataplane-connect-retries", defaultDataplaneConnRetries, "DataplaneAPI connection retry attempts")
+	viperx.MustBindFlag(viper.GetViper(), "dataplane-connect-retries", runCmd.PersistentFlags().Lookup("dataplane-connect-retries"))
+
+	runCmd.PersistentFlags().Duration("dataplane-connect-retry-interval", defaultDataplaneConnRetryInterval, "DataplaneAPI connection retry interval")
+	viperx.MustBindFlag(viper.GetViper(), "dataplane-connect-retry-interval", runCmd.PersistentFlags().Lookup("dataplane-connect-retry-interval"))
 
 	runCmd.PersistentFlags().String("base-haproxy-config", "", "Base config for haproxy")
 	viperx.MustBindFlag(viper.GetViper(), "haproxy.config.base", runCmd.PersistentFlags().Lookup("base-haproxy-config"))
@@ -88,12 +99,14 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 	}
 
 	mgr := &manager.Manager{
-		Context:         ctx,
-		Logger:          logger,
-		DataPlaneClient: dataplaneapi.NewClient(viper.GetString("dataplane.url"), dataplaneapi.WithLogger(logger)),
-		LBClient:        lbapi.NewClient(viper.GetString("loadbalancerapi.url")),
-		ManagedLBID:     managedLBID,
-		BaseCfgPath:     viper.GetString("haproxy.config.base"),
+		Context:                       ctx,
+		Logger:                        logger,
+		DataPlaneClient:               dataplaneapi.NewClient(viper.GetString("dataplane.url"), dataplaneapi.WithLogger(logger)),
+		DataPlaneConnectRetries:       viper.GetInt("dataplane-connect-retries"),
+		DataPlaneConnectRetryInterval: viper.GetDuration("dataplane-connect-retry-interval"),
+		LBClient:                      lbapi.NewClient(viper.GetString("loadbalancerapi.url")),
+		ManagedLBID:                   managedLBID,
+		BaseCfgPath:                   viper.GetString("haproxy.config.base"),
 	}
 
 	logger.Infow("Initializing...", zap.String("loadbalancerID", viper.GetString("loadbalancer.id")))
