@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"go.infratographer.com/x/events"
@@ -84,7 +85,7 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 	}
 
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
 	ctx, cancel := context.WithCancel(cmdCtx)
 
@@ -155,11 +156,6 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 	}
 
 	defer func() {
-		const shutdownTimeout = 10 * time.Second
-		ctx, cancel := context.WithTimeout(ctx, shutdownTimeout)
-
-		defer cancel()
-
 		_ = events.Shutdown(ctx)
 	}()
 

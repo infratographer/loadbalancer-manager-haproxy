@@ -69,14 +69,19 @@ func (m *Manager) Run() error {
 		m.Logger.Fatal("unable to reach dataplaneapi. is it running?")
 	}
 
-	// use desired config on start
-	if err := m.updateConfigToLatest(); err != nil {
-		m.Logger.Fatalw("failed to initialize the config", zap.Error(err))
-	}
+	select {
+	case <-m.Context.Done():
+		return nil
+	default:
+		// use desired config on start
+		if err := m.updateConfigToLatest(); err != nil {
+			m.Logger.Fatalw("failed to initialize the config", zap.Error(err))
+		}
 
-	// listen for event messages on subject(s)
-	if err := m.Subscriber.Listen(); err != nil {
-		return err
+		// listen for event messages on subject(s)
+		if err := m.Subscriber.Listen(); err != nil {
+			return err
+		}
 	}
 
 	return nil

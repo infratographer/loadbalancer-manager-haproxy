@@ -125,13 +125,19 @@ func (c *Client) PostConfig(ctx context.Context, config string) error {
 // WaitForDataPlaneReady waits for the DataPlane API to be ready
 func (c Client) WaitForDataPlaneReady(ctx context.Context, retries int, sleep time.Duration) error {
 	for i := 0; i < retries; i++ {
-		if c.APIIsReady(ctx) {
-			c.logger.Info("dataplaneapi is ready")
+		select {
+		case <-ctx.Done():
+			c.logger.Info("context done")
 			return nil
-		}
+		default:
+			if c.APIIsReady(ctx) {
+				c.logger.Info("dataplaneapi is ready")
+				return nil
+			}
 
-		c.logger.Info("waiting for dataplaneapi to become ready")
-		time.Sleep(sleep)
+			c.logger.Info("waiting for dataplaneapi to become ready")
+			time.Sleep(sleep)
+		}
 	}
 
 	return ErrDataPlaneNotReady
