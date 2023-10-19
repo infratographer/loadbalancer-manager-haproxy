@@ -38,3 +38,8 @@ clean: ## Clean up all the things
 vendor: ## Vendors dependencies
 	@go mod download
 	@go mod tidy
+
+go-run: ## Runs the app
+	@echo --- Running binary...
+	@date --rfc-3339=seconds
+	@go run main.go run

@@ -5,9 +5,8 @@ services:
       context: .
       dockerfile: Dockerfile
     command: sleep infinity
-    environment:
-      LOADBALANCER_MANAGER_HAPROXY_EVENTS_NATS_CREDSFILE: /etc/nats-auth/manager.creds
-      LOADBALANCER_MANAGER_HAPROXY_EVENTS_NATS_SUBSCRIBEPREFIX: com.infratographer
+    env_file:
+      - .env
     volumes:
       - ..:/workspaces:cached
       - nats-auth:/etc/nats-auth
