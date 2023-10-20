@@ -7,7 +7,6 @@ import (
 
 	parser "github.com/haproxytech/config-parser/v4"
 	"github.com/haproxytech/config-parser/v4/options"
-	"github.com/haproxytech/config-parser/v4/params"
 	"github.com/haproxytech/config-parser/v4/types"
 
 	lbapi "go.infratographer.com/load-balancer-api/pkg/client"
@@ -216,26 +215,16 @@ func mergeConfig(cfg parser.Parser, lb *lbapi.LoadBalancer) (parser.Parser, erro
 
 		for _, pool := range p.Node.Pools {
 			for _, origin := range pool.Origins.Edges {
-				var srvOptions []string
-
-				srvAddr := fmt.Sprintf("%s:%d", origin.Node.Target, origin.Node.PortNumber)
-
-				srvOptions = append(srvOptions, fmt.Sprintf("check port %d", origin.Node.PortNumber))
-				srvOptions = append(srvOptions, fmt.Sprintf("weight %d", origin.Node.Weight))
+				srvAddr := fmt.Sprintf("%s:%d check port %d", origin.Node.Target, origin.Node.PortNumber, origin.Node.PortNumber)
+				srvAddr += fmt.Sprintf(" weight %d", origin.Node.Weight)
 
 				if !origin.Node.Active {
-					srvOptions = append(srvOptions, "disabled")
-				}
-
-				srvParams := params.ParseServerOptions(srvOptions)
-				if len(srvParams) != len(srvOptions) {
-					return nil, newLabelError(p.Node.ID, errBackendServerFailure, errServerOptionParseFailure)
+					srvAddr += " disabled"
 				}
 
 				srvr := types.Server{
 					Name:    origin.Node.ID,
 					Address: srvAddr,
-					Params:  srvParams,
 				}
 
 				if err := cfg.Set(parser.Backends, p.Node.ID, "server", srvr); err != nil {
