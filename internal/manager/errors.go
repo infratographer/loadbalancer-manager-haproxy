@@ -23,9 +23,6 @@ var (
 
 	// errBackendServerFailure is returned when a server cannot be applied to a backend
 	errBackendServerFailure = errors.New("failed to add backend attr server: ")
-
-	// errServerOptionParseFailure is returned when a server option was failed to be parsed
-	errServerOptionParseFailure = errors.New("failed to parse server option")
 )
 
 func newLabelError(label string, err error, labelErr error) error {
