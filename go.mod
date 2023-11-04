@@ -7,7 +7,7 @@ toolchain go1.21.1
 require (
 	github.com/haproxytech/config-parser/v4 v4.1.0
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/spf13/cobra v1.7.0
+	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.17.0
 	github.com/stretchr/testify v1.8.4
 	go.infratographer.com/load-balancer-api v0.0.32
