@@ -262,6 +262,135 @@ func TestUpdateConfigToLatest(t *testing.T) {
 
 		assert.Equal(t, strings.TrimSpace(string(expCfg)), strings.TrimSpace(mgr.currentConfig))
 	})
+
+	t.Run("successfully queries lb api and merges changes with base config while excluding private ips in backend config", func(t *testing.T) {
+		t.Parallel()
+
+		mockLBAPI := &mock.LBAPIClient{
+			DoGetLoadBalancer: func(ctx context.Context, id string) (*lbapi.LoadBalancer, error) {
+				return &lbapi.LoadBalancer{
+					ID: "loadbal-test",
+					Ports: lbapi.Ports{
+						Edges: []lbapi.PortEdges{
+							{
+								Node: lbapi.PortNode{
+									ID:     "loadprt-test",
+									Name:   "ssh-service",
+									Number: 22,
+									Pools: []lbapi.Pool{
+										{
+											ID:       "loadpol-test",
+											Name:     "ssh-service-a",
+											Protocol: "tcp",
+											Origins: lbapi.Origins{
+												Edges: []lbapi.OriginEdges{
+													{
+														Node: lbapi.OriginNode{
+															ID:         "loadogn-test1",
+															Name:       "svr1-2222",
+															Target:     "1.2.3.4",
+															PortNumber: 2222,
+															Weight:     20,
+															Active:     true,
+														},
+													},
+													{
+														Node: lbapi.OriginNode{
+															ID:         "loadogn-test2",
+															Name:       "svr1-222",
+															Target:     "1.2.3.4",
+															PortNumber: 222,
+															Weight:     30,
+															Active:     true,
+														},
+													},
+													{
+														Node: lbapi.OriginNode{
+															ID:         "loadogn-test3",
+															Name:       "svr2",
+															Target:     "4.3.2.1",
+															PortNumber: 2222,
+															Weight:     50,
+															Active:     false,
+														},
+													},
+													{ // private ip will be skipped
+														Node: lbapi.OriginNode{
+															ID:         "loadogn-test4",
+															Name:       "svr2",
+															Target:     "10.0.0.0",
+															PortNumber: 2222,
+															Weight:     50,
+															Active:     false,
+														},
+													},
+													{ // private ip will be skipped
+														Node: lbapi.OriginNode{
+															ID:         "loadogn-test5",
+															Name:       "svr2",
+															Target:     "172.16.0.0",
+															PortNumber: 2222,
+															Weight:     50,
+															Active:     false,
+														},
+													},
+													{ // private ip will be skipped
+														Node: lbapi.OriginNode{
+															ID:         "loadogn-test6",
+															Name:       "svr2",
+															Target:     "192.168.0.0",
+															PortNumber: 2222,
+															Weight:     50,
+															Active:     false,
+														},
+													},
+													{ // private ip will be skipped
+														Node: lbapi.OriginNode{
+															ID:         "loadogn-test7",
+															Name:       "svr2",
+															Target:     "fc00:db8:3333:4444:5555:6666:7777:8888",
+															PortNumber: 2222,
+															Weight:     50,
+															Active:     false,
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				}, nil
+			},
+		}
+
+		mockDataplaneAPI := &mock.DataplaneAPIClient{
+			DoPostConfig: func(ctx context.Context, config string) error {
+				return nil
+			},
+			DoCheckConfig: func(ctx context.Context, config string) error {
+				return nil
+			},
+		}
+
+		mgr := Manager{
+			Logger:          logger,
+			LBClient:        mockLBAPI,
+			DataPlaneClient: mockDataplaneAPI,
+			BaseCfgPath:     testBaseCfgPath,
+			ManagedLBID:     gidx.PrefixedID("loadbal-test"),
+		}
+
+		err := mgr.updateConfigToLatest()
+		require.Nil(t, err)
+
+		expCfg, err := os.ReadFile(fmt.Sprintf("%s/%s", testDataBaseDir, "lb-ex-1-exp.cfg"))
+		require.Nil(t, err)
+
+		assert.Equal(t, strings.TrimSpace(string(expCfg)), strings.TrimSpace(mgr.currentConfig))
+	})
 }
 
 func TestLoadBalancerTargeted(t *testing.T) {
