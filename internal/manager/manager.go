@@ -3,6 +3,7 @@ package manager
 import (
 	"context"
 	"fmt"
+	"net"
 	"time"
 
 	parser "github.com/haproxytech/config-parser/v4"
@@ -168,7 +169,7 @@ func (m *Manager) updateConfigToLatest() error {
 	}
 
 	// merge response
-	cfg, err = mergeConfig(cfg, lb)
+	cfg, err = m.mergeConfig(cfg, lb)
 	if err != nil {
 		return err
 	}
@@ -190,7 +191,7 @@ func (m *Manager) updateConfigToLatest() error {
 }
 
 // mergeConfig takes the response from lb api, merges with the base haproxy config and returns it
-func mergeConfig(cfg parser.Parser, lb *lbapi.LoadBalancer) (parser.Parser, error) {
+func (m *Manager) mergeConfig(cfg parser.Parser, lb *lbapi.LoadBalancer) (parser.Parser, error) {
 	for _, p := range lb.Ports.Edges {
 		// create port
 		if err := cfg.SectionsCreate(parser.Frontends, p.Node.ID); err != nil {
@@ -215,6 +216,11 @@ func mergeConfig(cfg parser.Parser, lb *lbapi.LoadBalancer) (parser.Parser, erro
 
 		for _, pool := range p.Node.Pools {
 			for _, origin := range pool.Origins.Edges {
+				if isPrivateIP(origin.Node.Target) {
+					m.Logger.Warnf("private ip address not allowed, target: %s, portId: ", origin.Node.Target, p.Node.ID)
+					continue
+				}
+
 				srvAddr := fmt.Sprintf("%s:%d check port %d", origin.Node.Target, origin.Node.PortNumber, origin.Node.PortNumber)
 				srvAddr += fmt.Sprintf(" weight %d", origin.Node.Weight)
 
@@ -235,4 +241,29 @@ func mergeConfig(cfg parser.Parser, lb *lbapi.LoadBalancer) (parser.Parser, erro
 	}
 
 	return cfg, nil
+}
+
+func isPrivateIP(ip string) bool {
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return false // Invalid IP address
+	}
+
+	privateCIDRs := []*net.IPNet{
+		// Private IPv4 ranges
+		{IP: net.IPv4(10, 0, 0, 0), Mask: net.CIDRMask(8, 32)},     //nolint:gomnd
+		{IP: net.IPv4(172, 16, 0, 0), Mask: net.CIDRMask(12, 32)},  //nolint:gomnd
+		{IP: net.IPv4(192, 168, 0, 0), Mask: net.CIDRMask(16, 32)}, //nolint:gomnd
+
+		// IPv6 Unique local addresses (fc00::/7)
+		{IP: net.ParseIP("fc00::"), Mask: net.CIDRMask(7, 128)}, //nolint:gomnd
+	}
+
+	for _, cidr := range privateCIDRs {
+		if cidr.Contains(parsedIP) {
+			return true
+		}
+	}
+
+	return false
 }

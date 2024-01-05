@@ -31,6 +31,11 @@ const (
 )
 
 func TestMergeConfig(t *testing.T) {
+	l, err := zap.NewDevelopmentConfig().Build()
+	logger := l.Sugar()
+
+	require.Nil(t, err)
+
 	MergeConfigTests := []struct {
 		name                string
 		testInput           lbapi.LoadBalancer
@@ -48,10 +53,14 @@ func TestMergeConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			mgr := Manager{
+				Logger: logger,
+			}
+
 			cfg, err := parser.New(options.Path("../../.devcontainer/config/haproxy.cfg"), options.NoNamedDefaultsFrom)
 			require.Nil(t, err)
 
-			newCfg, err := mergeConfig(cfg, &tt.testInput)
+			newCfg, err := mgr.mergeConfig(cfg, &tt.testInput)
 			assert.Nil(t, err)
 
 			t.Log("Generated config ===> ", newCfg.String())
