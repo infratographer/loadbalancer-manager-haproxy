@@ -23,6 +23,9 @@ var (
 
 	// errBackendServerFailure is returned when a server cannot be applied to a backend
 	errBackendServerFailure = errors.New("failed to add backend attr server: ")
+
+	// errServerPrivateIPInvalid is returned when a private origin target ip is provided
+	errServerPrivateIPInvalid = errors.New("origin target is in a private ip range")
 )
 
 func newLabelError(label string, err error, labelErr error) error {

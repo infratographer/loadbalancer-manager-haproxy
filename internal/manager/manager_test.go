@@ -324,36 +324,6 @@ func TestUpdateConfigToLatest(t *testing.T) {
 															Active:     false,
 														},
 													},
-													{ // private ip will be skipped
-														Node: lbapi.OriginNode{
-															ID:         "loadogn-test5",
-															Name:       "svr2",
-															Target:     "172.16.0.0",
-															PortNumber: 2222,
-															Weight:     50,
-															Active:     false,
-														},
-													},
-													{ // private ip will be skipped
-														Node: lbapi.OriginNode{
-															ID:         "loadogn-test6",
-															Name:       "svr2",
-															Target:     "192.168.0.0",
-															PortNumber: 2222,
-															Weight:     50,
-															Active:     false,
-														},
-													},
-													{ // private ip will be skipped
-														Node: lbapi.OriginNode{
-															ID:         "loadogn-test7",
-															Name:       "svr2",
-															Target:     "fc00:db8:3333:4444:5555:6666:7777:8888",
-															PortNumber: 2222,
-															Weight:     50,
-															Active:     false,
-														},
-													},
 												},
 											},
 										},
@@ -384,12 +354,7 @@ func TestUpdateConfigToLatest(t *testing.T) {
 		}
 
 		err := mgr.updateConfigToLatest()
-		require.Nil(t, err)
-
-		expCfg, err := os.ReadFile(fmt.Sprintf("%s/%s", testDataBaseDir, "lb-ex-1-exp.cfg"))
-		require.Nil(t, err)
-
-		assert.Equal(t, strings.TrimSpace(string(expCfg)), strings.TrimSpace(mgr.currentConfig))
+		require.Error(t, err)
 	})
 }
 

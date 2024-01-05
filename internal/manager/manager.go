@@ -217,8 +217,7 @@ func (m *Manager) mergeConfig(cfg parser.Parser, lb *lbapi.LoadBalancer) (parser
 		for _, pool := range p.Node.Pools {
 			for _, origin := range pool.Origins.Edges {
 				if isPrivateIP(origin.Node.Target) {
-					m.Logger.Warnf("private ip address not allowed, target: %s, portId: ", origin.Node.Target, p.Node.ID)
-					continue
+					return nil, fmt.Errorf("error: %w, ip: %s", errServerPrivateIPInvalid, origin.Node.Target)
 				}
 
 				srvAddr := fmt.Sprintf("%s:%d check port %d", origin.Node.Target, origin.Node.PortNumber, origin.Node.PortNumber)
