@@ -3,8 +3,6 @@ package cmd
 import (
 	"context"
 	"errors"
-	"fmt"
-	"math/rand"
 	"os"
 	"os/signal"
 	"syscall"
@@ -127,15 +125,14 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 		mgr.LBClient = lbapi.NewClient(viper.GetString("loadbalancerapi.url"))
 	}
 
-	// generate a random queuegroup name
-	// this is to prevent multiple instances of this service from receiving the same message
-	// and processing it
-	config.AppConfig.Events.NATS.QueueGroup = generateQueueGroupName()
-
 	events, err := events.NewConnection(config.AppConfig.Events, events.WithLogger(logger))
 	if err != nil {
 		logger.Fatalw("failed to create events connection", "error", err)
 	}
+
+	defer func() {
+		_ = events.Shutdown(ctx)
+	}()
 
 	// init events subscriber
 	subscriber := pubsub.NewSubscriber(
@@ -154,10 +151,6 @@ func run(cmdCtx context.Context, v *viper.Viper) error {
 			return err
 		}
 	}
-
-	defer func() {
-		_ = events.Shutdown(ctx)
-	}()
 
 	if err := mgr.Run(); err != nil {
 		logger.Fatalw("failed starting manager", "error", err)
@@ -191,19 +184,4 @@ func validateMandatoryFlags() error {
 	}
 
 	return errors.Join(errs...) //nolint:goerr113
-}
-
-// generateQueueGroupName generates a random queue group name with prefix lbmanager-haproxy-
-func generateQueueGroupName() string {
-	const rlen = 10
-
-	alphaNum := []rune("abcdefghijklmnopqrstuvwxyz1234567890")
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
-	b := make([]rune, rlen)
-
-	for i := range b {
-		b[i] = alphaNum[r.Intn(len(alphaNum))]
-	}
-
-	return fmt.Sprintf("lbmanager-haproxy-%s-", string(b))
 }
