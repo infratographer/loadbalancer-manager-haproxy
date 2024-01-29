@@ -80,6 +80,8 @@ github.com/graph-gophers/graphql-transport-ws v0.0.2 h1:DbmSkbIGzj8SvHei6n8Mh9eL
 github.com/graph-gophers/graphql-transport-ws v0.0.2/go.mod h1:5BVKvFzOd2BalVIBFfnfmHjpJi/MZ5rOj8G55mXvZ8g=
 github.com/haproxytech/config-parser/v4 v4.1.0 h1:P1gu/UjiWo5Kg+4ZW/mHd657Uw7utoi8QBW8WhUWB3w=
 github.com/haproxytech/config-parser/v4 v4.1.0/go.mod h1:pZHV7TLt1PgY8ouMX2ZNQoZHe20LGybbqkNN4MKjGZ0=
+github.com/haproxytech/config-parser/v4 v4.2.1 h1:qiZ58h7B7KpwGhRTLRjhVhuJhMHRn2s24YeuL9MC/iE=
+github.com/haproxytech/config-parser/v4 v4.2.1/go.mod h1:Bsm7Snm4JMEmVLw34ABwuNbRIrakFj8WMDyWzjimCfc=
 github.com/haproxytech/go-logger v1.1.0 h1:HgGtYaI1ApkvbQdsm7f9AzQQoxTB7w37criTflh7IQE=
 github.com/haproxytech/go-logger v1.1.0/go.mod h1:OekUd8HCb7ubxMplzHUPBTHNxZmddOWfOjWclZsqIeM=
 github.com/hashicorp/hcl v1.0.0 h1:0Anlzjpi4vEasTeNFn2mLJgTSwt0+6sfsiTG8qcWGx4=
