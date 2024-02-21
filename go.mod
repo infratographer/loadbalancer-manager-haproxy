@@ -12,7 +12,7 @@ require (
 	github.com/stretchr/testify v1.8.4
 	go.infratographer.com/load-balancer-api v0.1.3
 	go.infratographer.com/x v0.3.10-0.20240122202348-a5142b682ef6
-	go.uber.org/zap v1.26.0
+	go.uber.org/zap v1.27.0
 )
 
 require (
