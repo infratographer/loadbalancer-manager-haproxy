@@ -11,7 +11,7 @@ require (
 	github.com/spf13/viper v1.18.2
 	github.com/stretchr/testify v1.8.4
 	go.infratographer.com/load-balancer-api v0.1.3
-	go.infratographer.com/x v0.3.10-0.20240122202348-a5142b682ef6
+	go.infratographer.com/x v0.3.10-0.20240129185339-bec1b00bf570
 	go.uber.org/zap v1.26.0
 )
 
