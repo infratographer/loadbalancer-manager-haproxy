@@ -368,6 +368,7 @@ func TestProcessMsg(t *testing.T) {
 			if tt.errMsg != "" {
 				require.Error(t, err)
 				assert.ErrorContains(t, err, tt.errMsg)
+
 				return
 			}
 
