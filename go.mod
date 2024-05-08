@@ -2,7 +2,7 @@ module go.infratographer.com/loadbalancer-manager-haproxy
 
 go 1.21
 
-toolchain go1.21.1
+toolchain go1.22.3
 
 require (
 	github.com/haproxytech/config-parser/v4 v4.1.0
