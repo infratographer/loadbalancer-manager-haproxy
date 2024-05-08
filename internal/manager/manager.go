@@ -223,7 +223,7 @@ func mergeConfig(cfg parser.Parser, lb *lbapi.LoadBalancer) (parser.Parser, erro
 				}
 
 				srvr := types.Server{
-					Name:    origin.Node.ID,
+					Name:    fmt.Sprintf("%s::%s", origin.Node.ID, origin.Node.Target),
 					Address: srvAddr,
 				}
 
