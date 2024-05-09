@@ -6,6 +6,7 @@ toolchain go1.22.3
 
 require (
 	github.com/haproxytech/config-parser/v4 v4.2.1
+	github.com/haproxytech/config-parser/v5 v5.1.4
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/spf13/cobra v1.8.0
 	github.com/spf13/viper v1.18.2
