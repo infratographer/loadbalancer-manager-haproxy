@@ -123,6 +123,8 @@ github.com/valyala/fasttemplate v1.2.2 h1:lxLXG0uE3Qnshl9QyaK6XJxMXlQZELvChBOCmQ
 github.com/valyala/fasttemplate v1.2.2/go.mod h1:KHLXt3tVN2HBp8eijSv/kGJopbvo7S+qRAEEKiv+SiQ=
 go.infratographer.com/load-balancer-api v0.3.0 h1:fAtImd2fN/bOQhOi+sy7dtViRe6Lqg34brAEjUUcP5I=
 go.infratographer.com/load-balancer-api v0.3.0/go.mod h1:QL988C8/QxW9fvIeiu206Dh5Q7ZGWUN54p3s/2gFDMw=
+go.infratographer.com/load-balancer-api v0.3.1 h1:X9Q5h98seustlXcMBqgUlqdnWO/JzITBAGubkDjKxq8=
+go.infratographer.com/load-balancer-api v0.3.1/go.mod h1:QL988C8/QxW9fvIeiu206Dh5Q7ZGWUN54p3s/2gFDMw=
 go.infratographer.com/x v0.5.1 h1:wJQWOyuDx0H/yj0FMG6PQUq1veSJnEgssIkbQzU7vQI=
 go.infratographer.com/x v0.5.1/go.mod h1:IyZALpwaaviUIN8bGp9cU0hnn1mn0A/6zi70XES4+iE=
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.51.0 h1:Xs2Ncz0gNihqu9iosIZ5SkBbWo5T8JhhLJFMQL1qmLI=
