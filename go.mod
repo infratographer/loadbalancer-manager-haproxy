@@ -1,8 +1,6 @@
 module go.infratographer.com/loadbalancer-manager-haproxy
 
-go 1.22
-
-toolchain go1.22.3
+go 1.24
 
 require (
 	github.com/haproxytech/config-parser/v4 v4.2.1
@@ -33,7 +31,7 @@ require (
 	github.com/hasura/go-graphql-client v0.12.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jaevor/go-nanoid v1.4.0 // indirect
-	github.com/klauspost/compress v1.17.8 // indirect
+	github.com/klauspost/compress v1.18.7 // indirect
 	github.com/labstack/echo-jwt/v4 v4.2.0 // indirect
 	github.com/labstack/echo/v4 v4.12.0 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
